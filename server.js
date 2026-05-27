@@ -52,5 +52,4 @@ app.post('/api/invoices', (req, res) => {
                                                                                                                                                         }
 
                                                                                                                                                         const PORT = 3000;
-                                                                                                                                                        app.listen(PORT, () => console.log(`CreativePay Backend active out in the open on port ${PORT}`));
-                                                                                                                                                    
+                                                                                                                                                        app.listen(PORT, () => console.log(`CreativePay Backend active out in the open on port ${PORT}`));                                                                                                           
