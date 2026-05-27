@@ -1,85 +1,77 @@
-const express = require('express');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { db, createInvoice, processBlockchainPayment } from './database.js';
+
+// Initialize Environment Variables and App
+dotenv.config();
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware Layers
+app.use(cors());
 app.use(express.json());
 
-// Import your database orchestration modules
-const { knex, initializeDatabaseSchema } = require('./database');
+// --- Tier 1: Core System API Health Check ---
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+      status: "OPERATIONAL",
+          infrastructure: "CreativePay Core Infrastructure Engine",
+              timestamp: new Date().toISOString()
+                });
+                });
 
-// 1. ENDPOINT: Creative generates a new invoice and persists it to PostgreSQL
-app.post('/api/invoices', async (req, res) => {
-    const { creatorId, amountUsd, localCurrency, creativePhone } = req.body;
-        
-            if (!creatorId || !amountUsd || !creativePhone) {
-                    return res.status(400).json({ error: "Missing required payout parameters." });
-                        }
+                // --- Tier 2: Invoicing Deployment Pipeline ---
+                app.post('/api/invoices', (req, res) => {
+                  const { creativeName, email, amountUSD, targetCurrency } = req.body;
 
-                            const invoiceId = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
-                                const exchangeRateMock = 1500; // Simulated real-time exchange pricing tier
-                                    const estimatedPayout = amountUsd * exchangeRateMock;
+                    if (!creativeName || !email || !amountUSD) {
+                        return res.status(400).json({ 
+                              error: "Missing required payroll parameters: creativeName, email, amountUSD" 
+                                  });
+                                    }
 
-                                        try {
-                                                // SQL Operation: Writes the raw invoice entry into the relational database
-                                                        await knex('invoices').insert({
-                                                                    invoice_id: invoiceId,
-                                                                                creator_id: creatorId,
-                                                                                            amount_usd: amountUsd,
-                                                                                                        payout_fiat_estimated: estimatedPayout,
-                                                                                                                    status: 'PENDING_PAYMENT',
-                                                                                                                                blockchain_tx_hash: null
-                                                                                                                                        });
+                                      const invoice = createInvoice({ creativeName, email, amountUSD, targetCurrency });
+                                        res.status(201).json({
+                                            message: "Global invoice created successfully. Awaiting stablecoin settlement.",
+                                                invoice
+                                                  });
+                                                  });
 
-                                                                                                                                                res.status(201).json({ 
-                                                                                                                                                            message: "Invoice successfully saved to database ledger.", 
-                                                                                                                                                                        invoice: { invoiceId, creatorId, amountUsd, estimatedPayout, status: 'PENDING_PAYMENT' } 
-                                                                                                                                                                                });
-                                                                                                                                                                                    } catch (error) {
-                                                                                                                                                                                            console.error('[SERVER RUNTIME ERROR]: Database insertion failed:', error);
-                                                                                                                                                                                                    res.status(500).json({ error: "Failed to persist transaction entry to infrastructure ledger." });
-                                                                                                                                                                                                        }
-                                                                                                                                                                                                        });
+                                                  // --- Tier 3 & 4: Blockchain Automation & Mobile Money Liquidation Gateway ---
+                                                  app.post('/api/webhooks/blockchain-payment', (req, res) => {
+                                                    const { txHash, invoiceId } = req.body;
 
-                                                                                                                                                                                                        // 2. ENDPOINT: Webhook updates database when stablecoin payment settles on-chain
-                                                                                                                                                                                                        app.post('/api/webhooks/blockchain-payment', async (req, res) => {
-                                                                                                                                                                                                            const { invoiceId, txHash } = req.body;
+                                                      if (!txHash || !invoiceId) {
+                                                          return res.status(400).json({ 
+                                                                error: "Missing required validation parameters: txHash, invoiceId" 
+                                                                    });
+                                                                      }
 
-                                                                                                                                                                                                                try {
-                                                                                                                                                                                                                        // SQL Operation: Atomically updates transaction row state based on blockchain event hash
-                                                                                                                                                                                                                                const rowsUpdated = await knex('invoices')
-                                                                                                                                                                                                                                            .where({ invoice_id: invoiceId })
-                                                                                                                                                                                                                                                        .update({
-                                                                                                                                                                                                                                                                        status: 'CRYPTO_RECEIVED',
-                                                                                                                                                                                                                                                                                        blockchain_tx_hash: txHash
-                                                                                                                                                                                                                                                                                                    });
+                                                                        const calculationResult = processBlockchainPayment(txHash, invoiceId);
 
-                                                                                                                                                                                                                                                                                                            if (rowsUpdated === 0) {
-                                                                                                                                                                                                                                                                                                                        return res.status(404).json({ error: "Invoice ID tracking node not found in records." });
-                                                                                                                                                                                                                                                                                                                                }
+                                                                          if (!calculationResult.success) {
+                                                                              return res.status(400).json({ error: calculationResult.message });
+                                                                                }
 
-                                                                                                                                                                                                                                                                                                                                        console.log(`[LEDGER UPDATE]: Invoice ${invoiceId} updated with hash ${txHash}. Activating cashout...`);
-                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                        // Triggers downstream payment aggregators (e.g. pawaPay architecture pipeline)
-                                                                                                                                                                                                                                                                                                                                                                await triggerMobileMoneyPayout(invoiceId, txHash);
+                                                                                  res.status(200).json({
+                                                                                      message: "Stablecoin payment verified. Funds converted and queued for mobile money distribution.",
+                                                                                          transaction: calculationResult.transaction
+                                                                                            });
+                                                                                            });
 
-                                                                                                                                                                                                                                                                                                                                                                        res.status(200).json({ message: "Database updated, B2C payment pipeline triggered." });
-                                                                                                                                                                                                                                                                                                                                                                            } catch (error) {
-                                                                                                                                                                                                                                                                                                                                                                                    console.error('[WEBHOOK FAULT]: Ledger state transition failed:', error);
-                                                                                                                                                                                                                                                                                                                                                                                            res.status(500).json({ error: "Internal ledger processing error occurred." });
-                                                                                                                                                                                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                                                                                                                                                                                                });
+                                                                                            // --- Venture Capital & Investor Metrics Tracking Dashboard Endpoint ---
+                                                                                            app.get('/api/analytics', (req, res) => {
+                                                                                              res.status(200).json({
+                                                                                                  company: "CreativePay Infrastructure",
+                                                                                                      monetizationModel: "1% flat cross-border settlement fee",
+                                                                                                          metrics: db.analytics,
+                                                                                                              activeInvoices: db.invoices,
+                                                                                                                  ledgerHistory: db.transactions
+                                                                                                                    });
+                                                                                                                    });
 
-                                                                                                                                                                                                                                                                                                                                                                                                async function triggerMobileMoneyPayout(invoiceId, txHash) {
-                                                                                                                                                                                                                                                                                                                                                                                                    console.log(`[PAYOUT INFRASTRUCTURE]: Coordinating mobile wallet payout routing for invoice ${invoiceId}...`);
-                                                                                                                                                                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                                                                                                                                                            // SQL Operation: Sets system status node to full completion post-settlement
-                                                                                                                                                                                                                                                                                                                                                                                                                await knex('invoices')
-                                                                                                                                                                                                                                                                                                                                                                                                                        .where({ invoice_id: invoiceId })
-                                                                                                                                                                                                                                                                                                                                                                                                                                .update({ status: 'SETTLED_SUCCESSFULLY' });
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                    console.log(`[SUCCESS]: Transaction ${invoiceId} marked settled in global accounting system.`);
-                                                                                                                                                                                                                                                                                                                                                                                                                                    }
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                    // System Boot Sequence: Assures environment structures exist prior to handling networking traffic
-                                                                                                                                                                                                                                                                                                                                                                                                                                    const PORT = 3000;
-                                                                                                                                                                                                                                                                                                                                                                                                                                    initializeDatabaseSchema().then(() => {
-                                                                                                                                                                                                                                                                                                                                                                                                                                        app.listen(PORT, () => console.log(`Connected Infrastructure Server live on port ${PORT}`));
-                                                                                                                                                                                                                                                                                                                                                                                                                                        });
+                                                                                                                    // Start Server Listen Execution Loop
+                                                                                                                    app.listen(PORT, () => {
+                                                                                                                      console.log(`🚀 CreativePay Engine running on port ${PORT}`);
+                                                                                                                      });
