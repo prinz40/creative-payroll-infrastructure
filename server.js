@@ -37,43 +37,7 @@ app.get('/api/health', (req, res) => {
                                                 invoice
                                                   });
                                                   });
-                                                  // --- Tier 3 & 4: Blockchain Automation & Mobile Money Liquidation Gateway ---
-                                                  app.post('/api/webhooks/blockchain-payment', (req, res) => {
-                                                    const { txHash, invoiceId } = req.body;
 
-                                                      if (!txHash || !invoiceId) {
-                                                          return res.status(400).json({ 
-                                                                error: "Missing required validation parameters: txHash, invoiceId" 
-                                                                    });
-                                                                      }
-
-                                                                        const calculationResult = processBlockchainPayment(txHash, invoiceId);
-
-                                                                          if (!calculationResult.success) {
-                                                                              return res.status(400).json({ error: calculationResult.message });
-                                                                                }
-
-                                                                                  res.status(200).json({
-                                                                                      message: "Stablecoin payment verified. Funds converted and queued for mobile money distribution.",
-                                                                                          transaction: calculationResult.transaction
-                                                                                            });
-                                                                                            });
-
-                                                                                            // --- Venture Capital & Investor Metrics Tracking Dashboard Endpoint ---
-                                                                                            app.get('/api/analytics', (req, res) => {
-                                                                                              res.status(200).json({
-                                                                                                  company: "CreativePay Infrastructure",
-                                                                                                      monetizationModel: "1% flat cross-border settlement fee",
-                                                                                                          metrics: db.analytics,
-                                                                                                              activeInvoices: db.invoices,
-                                                                                                                  ledgerHistory: db.transactions
-                                                                                                                    });
-                                                                                                                    });
-
-                                                                                                                    // Start Server Listen Execution Loop
-                                                                                                                    app.listen(PORT, () => {
-                                                                                                                      console.log(`🚀 CreativePay Engine running on port ${PORT}`);
-                                                                                                                  })
                                                   // --- Tier 3 & 4: Blockchain Automation & Mobile Money Liquidation Gateway ---
                                                   app.post('/api/webhooks/blockchain-payment', (req, res) => {
                                                     const { txHash, invoiceId } = req.body;
@@ -111,3 +75,4 @@ app.get('/api/health', (req, res) => {
                                                                                                                     app.listen(PORT, () => {
                                                                                                                       console.log(`🚀 CreativePay Engine running on port ${PORT}`);
                                                                                                                       });
+                                                                                                                      
