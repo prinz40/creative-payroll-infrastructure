@@ -1,54 +1,82 @@
-// Database orchestration configuration using SQL schema layouts
-const knex = require('knex')({
-  client: 'pg', // PostgreSQL production infrastructure connector
-    connection: {
-        host: process.env.DB_HOST || '127.0.0.1',
-            user: process.env.DB_USER || 'creativepay_admin',
-                password: process.env.DB_PASSWORD || 'SecureInfrastructurePass123!',
-                    database: process.env.DB_NAME || 'creativepay_ledger'
-                      },
-                        pool: { min: 2, max: 10 } // Allocates optimized traffic connection pooling
-                        });
+// Mock Database State for CreativePay Infrastructure
+export const db = {
+  invoices: [],
+    webhooks: [],
+      transactions: [],
+        analytics: {
+            totalVolumeUSD: 0,
+                totalFeesCollectedUSD: 0,
+                    processedPayoutsCount: 0
+                      }
+                      };
 
-                        /**
-                         * ARCHITECTURAL STEP: Programmatic Table Schemas
-                          * Automatically initializes relational database architectures if absent on the production server.
-                           */
-                           async function initializeDatabaseSchema() {
-                             try {
-                                 // 1. Core Users and Creative Profiles Table Setup
-                                     const hasUsersTable = await knex.schema.hasTable('users');
-                                         if (!hasUsersTable) {
-                                               await knex.schema.createTable('users', (table) => {
-                                                       table.uuid('user_id').primary().defaultTo(knex.raw('gen_random_uuid()'));
-                                                               table.string('email').unique().notNullable();
-                                                                       table.string('phone_number').notNullable(); // Vital node for mobile money API calls
-                                                                               table.string('country_code').defaultTo('NG'); // Standard ISO routing flags (NG, GH, KE)
-                                                                                       table.timestamp('created_at').defaultTo(knex.fn.now());
-                                                                                             });
-                                                                                                   console.log('[DATABASE ENGINE]: Users table infrastructure created successfully.');
-                                                                                                       }
+                      // Supported Settlement Correncies & Simulated Liquidity FX Rates
+                      export const FX_RATES = {
+                        NGN: 1500.00, // Nigerian Naira
+                          GHS: 14.50,   // Ghanaian Cedi
+                            KES: 130.00   // Kenyan Shilling
+                            };
 
-                                                                                                           // 2. Financial Invoices Ledger Table Setup
-                                                                                                               const hasInvoicesTable = await knex.schema.hasTable('invoices');
-                                                                                                                   if (!hasInvoicesTable) {
-                                                                                                                         await knex.schema.createTable('invoices', (table) => {
-                                                                                                                                 table.string('invoice_id').primary(); // Formatted String e.g. INV-102943
-                                                                                                                                         table.uuid('creator_id').references('user_id').inTable('users').onDelete('CASCADE');
-                                                                                                                                                 table.decimal('amount_usd', 14, 2).notNullable(); // Accurate decimal scaling for currency financial math
-                                                                                                                                                         table.decimal('payout_fiat_estimated', 14, 2); 
-                                                                                                                                                                 table.string('status').defaultTo('PENDING_PAYMENT'); // PENDING_PAYMENT -> CRYPTO_RECEIVED -> SETTLED_SUCCESSFULLY
-                                                                                                                                                                         table.string('blockchain_tx_hash').nullable(); // Immutable on-chain ledger cross-reference
-                                                                                                                                                                                 table.timestamp('issued_at').defaultTo(knex.fn.now());
-                                                                                                                                                                                       });
-                                                                                                                                                                                             console.log('[DATABASE ENGINE]: Invoices relational ledger table initialized.');
-                                                                                                                                                                                                 }
-                                                                                                                                                                                                   } catch (error) {
-                                                                                                                                                                                                       console.error('[CRITICAL DATABASE FAILURE]: Failed to orchestrate ledger structure:', error);
-                                                                                                                                                                                                         }
-                                                                                                                                                                                                         }
+                            /**
+                             * Creates a structured parameter invoice object
+                              */
+                              export function createInvoice(invoiceData) {
+                                const newInvoice = {
+                                    id: `inv_${Math.random().toString(36).substr(2, 9)}`,
+                                        creativeName: invoiceData.creativeName,
+                                            email: invoiceData.email,
+                                                amountUSD: parseFloat(invoiceData.amountUSD),
+                                                    targetCurrency: invoiceData.targetCurrency || 'NGN',
+                                                        status: 'PENDING',
+                                                            createdAt: new Date().toISOString()
+                                                              };
+                                                                
+                                                                  db.invoices.push(newInvoice);
+                                                                    return newInvoice;
+                                                                    }
 
-                                                                                                                                                                                                         module.exports = {
-                                                                                                                                                                                                           knex,
-                                                                                                                                                                                                             initializeDatabaseSchema
-                                                                                                                                                                                                             };
+                                                                    /**
+                                                                     * Processes automated stablecoin settlement, liquidates crypto, 
+                                                                      * deducts 1% flat venture fee, and queues B2C mobile money distribution.
+                                                                       */
+                                                                       export function processBlockchainPayment(txHash, invoiceId) {
+                                                                         const invoice = db.invoices.find(i => i.id === invoiceId);
+                                                                           if (!invoice) return { success: false, message: "Invoice target not found" };
+                                                                             
+                                                                               if (invoice.status === 'SETTLED') {
+                                                                                   return { success: false, message: "Invoice already settled" };
+                                                                                     }
+
+                                                                                       // Calculate infrastructure monetization model (1% Flat Settlement Fee)
+                                                                                         const feeUSD = invoice.amountUSD * 0.01;
+                                                                                           const netAmountUSD = invoice.amountUSD - feeUSD;
+                                                                                             
+                                                                                               // Calculate FX Liquidation Pipeline Conversion
+                                                                                                 const fxRate = FX_RATES[invoice.targetCurrency] || 1.0;
+                                                                                                   const payoutLocalAmount = netAmountUSD * fxRate;
+
+                                                                                                     // Update invoice status
+                                                                                                       invoice.status = 'SETTLED';
+                                                                                                         invoice.settledAt = new Date().toISOString();
+                                                                                                           invoice.txHash = txHash;
+
+                                                                                                             // Track global venture capital metrics
+                                                                                                               db.analytics.totalVolumeUSD += invoice.amountUSD;
+                                                                                                                 db.analytics.totalFeesCollectedUSD += feeUSD;
+                                                                                                                   db.analytics.processedPayoutsCount += 1;
+
+                                                                                                                     const transactionRecord = {
+                                                                                                                         id: `tx_${Math.random().toString(36).substr(2, 9)}`,
+                                                                                                                             invoiceId: invoice.id,
+                                                                                                                                 blockchainHash: txHash,
+                                                                                                                                     grossUSD: invoice.amountUSD,
+                                                                                                                                         platformFeeUSD: feeUSD,
+                                                                                                                                             netUSD: netAmountUSD,
+                                                                                                                                                 payoutLocal: `${payoutLocalAmount.toFixed(2)} ${invoice.targetCurrency}`,
+                                                                                                                                                     timestamp: new Date().toISOString()
+                                                                                                                                                       };
+
+                                                                                                                                                         db.transactions.push(transactionRecord);
+                                                                                                                                                           return { success: true, transaction: transactionRecord };
+                                                                                                                                                           }
+                                                                                                                                                           
