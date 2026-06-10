@@ -44,7 +44,7 @@
     </div>
 
     <script>
-        // TARGET HOST CONFIGURATION
+        // TARGET HOST CONFIGURATION - Uses relative routing paths for secure cloud connection
         const HOST = "";
         
         let savedInvoiceId = "";
@@ -69,7 +69,9 @@
                     })
                 });
                 const data = await res.json();
-                savedInvoiceId = data.invoice.id;
+                
+                // Fixed MongoDB Object Data Key Binding Mapping Layer
+                savedInvoiceId = data.invoice.id || data.invoice._id;
                 document.getElementById("current-inv-id").innerText = savedInvoiceId;
                 log(data);
             } catch (err) { log("Error: " + err.message); }
@@ -105,5 +107,4 @@
         }
     </script>
 </body>
-  </html>
-
+</html>
