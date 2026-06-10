@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CreativePay Mobile Test Suite</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 20px; margin: 0; }
+        h1 { color: #58a6ff; font-size: 22px; text-align: center; border-bottom: 1px solid #21262d; padding-bottom: 15px; margin-top: 10px; }
+        .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 15px; }
+        .card-title { font-weight: bold; margin-bottom: 8px; color: #f0f6fc; font-size: 14px; text-transform: uppercase; }
+        button { background-color: #238636; color: white; border: none; padding: 12px 20px; font-size: 15px; border-radius: 6px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        button:active { background-color: #2ea043; }
+        button.sec-btn { background-color: #1f6feb; }
+        button.sec-btn:active { background-color: #388bfd; }
+        button.danger-btn { background-color: #da3633; }
+        button.danger-btn:active { background-color: #f85149; }
+        pre { background-color: #010409; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #7ee787; border: 1px solid #21262d; max-height: 150px; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 CreativePay Control Dashboard</h1>
+
+    <div class="card">
+        <div class="card-title">Tier 1 & 2: Invoice Engine</div>
+        <button class="sec-btn" onclick="generateInvoice()">Create Mock $500 Invoice</button>
+        <p>Invoice ID Saved: <span id="current-inv-id" style="color:#58a6ff; font-weight:bold;">None</span></p>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Tier 3 & 4: Liquidity Settlement Engine</div>
+        <button onclick="settlePayment()">Process Stablecoin Liquidation</button>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Security Perimeter Defense</div>
+        <button class="danger-btn" onclick="triggerDoubleSpend()">Test Anti-Double Spend Guard</button>
+    </div>
+
+    <div class="card">
+        <div class="card-title">Venture Capital Metrics Terminal</div>
+        <pre id="output-window">Click a button above to run real-time cloud computations...</pre>
+    </div>
+
+    <script>
+        // TARGET HOST CONFIGURATION
+        const HOST = "https://onrender.com";
+        
+        let savedInvoiceId = "";
+        let savedTxHash = "";
+        const logger = document.getElementById("output-window");
+
+        function log(msg) {
+            logger.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+        }
+
+        async function generateInvoice() {
+            log("Generating core invoice on the cloud...");
+            try {
+                const res = await fetch(`${HOST}/api/invoices`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        creativeName: "Prinz Creator",
+                        email: "founder@creativepay.network",
+                        amountUSD: 500,
+                        targetCurrency: "NGN"
+                    })
+                });
+                const data = await res.json();
+                savedInvoiceId = data.invoice.id;
+                document.getElementById("current-inv-id").innerText = savedInvoiceId;
+                log(data);
+            } catch (err) { log("Error: " + err.message); }
+        }
+
+        async function settlePayment() {
+            if(!savedInvoiceId) { alert("Please generate an invoice first!"); return; }
+            log("Simulating on-chain settlement pipeline...");
+            savedTxHash = "0x7a" + Math.random().toString(16).substr(2, 40);
+            try {
+                const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ txHash: savedTxHash, invoiceId: savedInvoiceId })
+                });
+                const data = await res.json();
+                log(data);
+            } catch (err) { log("Error: " + err.message); }
+        }
+
+        async function triggerDoubleSpend() {
+            if(!savedInvoiceId || !savedTxHash) { alert("Please run an invoice and first settlement transaction first!"); return; }
+            log("Executing Exploit Attempt: Replaying duplicate transaction hash...");
+            try {
+                const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ txHash: savedTxHash, invoiceId: savedInvoiceId })
+                });
+                const data = await res.json();
+                log(data);
+            } catch (err) { log("Error: " + err.message); }
+        }
+    </script>
+</body>
+  </html>
+
