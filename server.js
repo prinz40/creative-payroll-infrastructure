@@ -9,14 +9,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Resolve ES module file paths safely for the production server environment
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(cors());
 app.use(express.json());
 
-// Premium Interface Route: Securely delivers our control dashboard to investors
+// Premium Interface Route: Securely delivers our control dashboard
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'Index.html'));
 });
@@ -26,36 +25,44 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: "OPERATIONAL" });
 });
 
-// Tier 2: Invoices Pipeline Endpoint
-app.post('/api/invoices', (req, res) => {
-  const { creativeName, email, amountUSD, targetCurrency } = req.body;
-  
-  if (!creativeName || !email || !amountUSD) {
-    return res.status(400).json({ error: "Missing required parameters: creativeName, email, and amountUSD are mandatory" });
-  }
+// Tier 2: Invoices Pipeline Endpoint (Upgraded for Cloud Cluster Async Handshaking)
+app.post('/api/invoices', async (req, res) => {
+  try {
+    const { creativeName, email, amountUSD, targetCurrency } = req.body;
+    
+    if (!creativeName || !email || !amountUSD) {
+      return res.status(400).json({ error: "Missing required parameters: creativeName, email, and amountUSD are mandatory" });
+    }
 
-  const invoice = createInvoice({ creativeName, email, amountUSD, targetCurrency });
-  res.status(201).json({ message: "Invoice created successfully", invoice });
+    const invoice = await createInvoice({ creativeName, email, amountUSD, targetCurrency });
+    res.status(201).json({ message: "Invoice created successfully", invoice });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error occurred writing to cluster" });
+  }
 });
 
-// Tier 3 & 4: Blockchain Automation Webhook
-app.post('/api/webhooks/blockchain-payment', (req, res) => {
-  const { txHash, invoiceId } = req.body;
+// Tier 3 & 4: Blockchain Automation Webhook (Upgraded for Cloud Cluster Async Handshaking)
+app.post('/api/webhooks/blockchain-payment', async (req, res) => {
+  try {
+    const { txHash, invoiceId } = req.body;
 
-  if (!txHash || !invoiceId) {
-    return res.status(400).json({ error: "Missing required parameters: txHash and invoiceId are mandatory" });
+    if (!txHash || !invoiceId) {
+      return res.status(400).json({ error: "Missing required parameters: txHash and invoiceId are mandatory" });
+    }
+
+    const result = await processBlockchainPayment(txHash, invoiceId);
+    
+    if (!result.success) {
+      return res.status(400).json({ error: result.message });
+    }
+
+    return res.status(200).json({ 
+      message: "Payment verified successfully", 
+      transaction: result.transaction 
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Internal server error occurred updating cluster transaction space" });
   }
-
-  const result = processBlockchainPayment(txHash, invoiceId);
-  
-  if (!result.success) {
-    return res.status(400).json({ error: result.message });
-  }
-
-  return res.status(200).json({ 
-    message: "Payment verified successfully", 
-    transaction: result.transaction 
-  });
 });
 
 // Venture Capital Analytics Dashboard Endpoint
@@ -69,4 +76,3 @@ app.get('/api/analytics', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-      
