@@ -18,7 +18,7 @@ app.use(express.json());
 
 // Premium Interface Route: Securely delivers our control dashboard to investors
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'Index.html'));
 });
 
 // Tier 1: Health Check Endpoint
