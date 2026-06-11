@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import helmet from 'helmet';
-import rateLimit from 'rate-limit';
+import rateLimit from 'express-rate-limit';
 import { db, createInvoice, processBlockchainPayment } from './database-v2.js';
 
 dotenv.config();
@@ -92,4 +92,4 @@ app.get('/api/analytics', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Enterprise Secured Gateway Active: Listening on port ${PORT}`);
 });
-              
+            
