@@ -32,7 +32,7 @@ app.use('/api/', apiRateLimiter);
 
 // Premium Interface Route
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'Index.html')); // Fixed case sensitivity to match Index.html
 });
 
 // Tier 1: Health Check Endpoint
@@ -92,4 +92,4 @@ app.get('/api/analytics', (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Enterprise Secured Gateway Active: Listening on port ${PORT}`);
 });
-            
+        
