@@ -1,6 +1,6 @@
 {
   "name": "creative-payroll-infrastructure",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Payroll and Monetization Model API",
   "main": "server.js",
   "type": "module",
