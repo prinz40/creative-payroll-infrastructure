@@ -78,10 +78,32 @@
             word-wrap: break-word;
             margin: 0;
         }
-        p {
-            font-size: 13px;
-            margin: 5px 0;
+        p { font-size: 13px; margin: 5px 0; }
+        
+        /* TIMELINE STYLING LAYER */
+        .timeline-container {
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
         }
+        .timeline-item {
+            border-left: 3px solid #30363d;
+            padding-left: 12px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .timeline-badge {
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+        .bg-create { background-color: #1f6feb; color: #fff; }
+        .bg-settle { background-color: #238636; color: #fff; }
+        .bg-attack { background-color: #da3633; color: #fff; }
+        .meta-text { font-size: 11px; color: #8b949e; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -104,7 +126,6 @@
         <button class="danger-btn" onclick="triggerDoubleSpend()">Test Anti-Double Spend Guard</button>
     </div>
 
-    <!-- NEW ENTERPRISE LAYER: GLOBAL PAYOUT LEDGER WINDOW -->
     <div class="card" style="border-left: 5px solid #2ecc71;">
         <div class="card-title">🌍 Global Payout Settlement Ledger</div>
         <div style="padding: 10px; background: #010409; border: 1px solid #30363d; border-radius: 6px; font-family: monospace;">
@@ -117,6 +138,14 @@
         </div>
     </div>
 
+    <!-- NEW ENTERPRISE LAYER: IMMUTABLE AUDIT TRAIL TIMELINE -->
+    <div class="card" style="border-top: 3px solid #f1c40f;">
+        <div class="card-title">🛡️ Global Integrity & Audit Trail Timeline</div>
+        <div id="timeline-window" class="timeline-container">
+            <p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">Awaiting network data synchronization...</p>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-title">Venture Capital Metrics Terminal</div>
         <pre id="output-window">Click a button above to run real-time cloud computations...</pre>
@@ -124,7 +153,6 @@
 
     <script>
         const HOST = "";
-
         let savedInvoiceId = "";
         let savedTxHash = "";
         const logger = document.getElementById("output-window");
@@ -140,6 +168,35 @@
             document.getElementById("ledger-fee").innerText = "$0.00 USD";
             document.getElementById("ledger-net").innerText = "$0.00 USD";
             document.getElementById("ledger-payout").innerText = "Calculating FX...";
+        }
+
+        // REAL-TIME AUDIT TRAIL DATA SYNC ENGINE
+        async function fetchAuditTrail() {
+            try {
+                const res = await fetch(`${HOST}/api/audit-trail`);
+                const logs = await res.getReader ? [] : await res.json();
+                if (!Array.isArray(logs)) return;
+                
+                const timeline = document.getElementById("timeline-window");
+                if (logs.length === 0) {
+                    timeline.innerHTML = `<p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">No audit events recorded yet.</p>`;
+                    return;
+                }
+
+                timeline.innerHTML = logs.map(item => {
+                    let badgeClass = "bg-create";
+                    if (item.eventType === "PAYMENT_SETTLED") badgeClass = "bg-settle";
+                    if (item.eventType === "ATTACK_BLOCKED") badgeClass = "bg-attack";
+
+                    return `
+                        <div class="timeline-item" style="border-left-color: ${item.eventType === 'ATTACK_BLOCKED' ? '#da3633' : '#30363d'}">
+                            <span class="timeline-badge ${badgeClass}">${item.eventType}</span>
+                            <p style="margin: 3px 0; font-size: 12px; font-weight: 500;">${item.description}</p>
+                            <div class="meta-text">📍 IP: ${item.ipAddress} | 🖥️ OS: ${item.userAgent.substring(0, 45)}...</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) { console.error("Audit trail pull fault:", err); }
         }
 
         async function generateInvoice() {
@@ -159,6 +216,7 @@
                 savedInvoiceId = data.invoice?._id || data.invoice?.id;
                 document.getElementById("current-inv-id").innerText = savedInvoiceId || "Error";
                 log(data);
+                fetchAuditTrail();
             } catch (err) { log("Error: " + err.message); }
         }
 
@@ -176,35 +234,6 @@
                 const data = await res.json();
                 log(data);
 
-                // Update the Ledger UI Components with converted numbers
                 if (data.transaction) {
                     document.getElementById("ledger-status").innerText = "SETTLED / ASSETS DISBURSED";
                     document.getElementById("ledger-status").style.color = "#7ee787";
-                    document.getElementById("ledger-gross").innerText = `$${data.transaction.grossUSD.toFixed(2)} USD`;
-                    document.getElementById("ledger-fee").innerText = `$${data.transaction.platformFeeUSD.toFixed(2)} USD`;
-                    document.getElementById("ledger-net").innerText = `$${data.transaction.netUSD.toFixed(2)} USD`;
-                    document.getElementById("ledger-payout").innerText = data.transaction.payoutLocal;
-                }
-            } catch (err) { 
-                document.getElementById("ledger-status").innerText = "SETTLED FAILED";
-                document.getElementById("ledger-status").style.color = "#da3633";
-                log("Error: " + err.message); 
-            }
-        }
-
-        async function triggerDoubleSpend() {
-            if (!savedInvoiceId || !savedTxHash) { alert("Please run an invoice first and settle it!"); return; }
-            log("Executing Exploit Attempt: Replaying duplicate transaction hash...");
-            try {
-                const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ txHash: savedTxHash, invoiceId: savedInvoiceId })
-                });
-                const data = await res.json();
-                log(data);
-            } catch (err) { log("Error: " + err.message); }
-        }
-    </script>
-</body>
-</html>
