@@ -41,10 +41,20 @@ const AnalyticsSchema = new mongoose.Schema({
     processedPayoutsCount: { type: Number, default: 0 }
 });
 
+// COMPLIANCE LAYER: IMMUTABLE AUDIT LOG SCHEMA
+const AuditLogSchema = new mongoose.Schema({
+    eventType: { type: String, required: true }, // INVOICE_CREATED, PAYMENT_SETTLED, ATTACK_BLOCKED
+    description: { type: String, required: true },
+    ipAddress: { type: String, default: '0.0.0.0' },
+    userAgent: { type: String, default: 'Unknown Device' },
+    timestamp: { type: Date, default: Date.now }
+});
+
 // Compile Models
 export const Invoice = mongoose.model('Invoice_v2', InvoiceSchema);
 export const Transaction = mongoose.model('Transaction_v2', TransactionSchema);
 export const Analytics = mongoose.model('Analytics_v2', AnalyticsSchema);
+export const AuditLog = mongoose.model('AuditLog_v2', AuditLogSchema);
 
 // Export dynamic mock database reference for analytics visibility compatibility
 export const db = {
@@ -71,7 +81,6 @@ async function initializeAnalyticsSeed() {
         if (!record) {
             record = await Analytics.create({ company: 'CreativePay' });
         }
-        // Keep local dynamic variable tracking perfectly synchronized in real-time
         db.analytics.totalVolumeUSD = record.totalVolumeUSD;
         db.analytics.totalFeesCollectedUSD = record.totalFeesCollectedUSD;
         db.analytics.processedPayoutsCount = record.processedPayoutsCount;
@@ -81,13 +90,22 @@ async function initializeAnalyticsSeed() {
 }
 
 // 3. ENTERPRISE TRANSACTION CONTROLLERS
-export async function createInvoice(data) {
-    return await Invoice.create(data);
+export async function createInvoice(data, securityMeta = {}) {
+    const invoice = await Invoice.create(data);
+    
+    // Log the transaction creation event immutably
+    await AuditLog.create({
+        eventType: 'INVOICE_CREATED',
+        description: `Generated fresh invoice for ${data.creativeName} totaling $${data.amountUSD} USD.`,
+        ipAddress: securityMeta.ip,
+        userAgent: securityMeta.userAgent
+    });
+    
+    return invoice;
 }
 
-export async function processBlockchainPayment(txHash, invoiceId) {
+export async function processBlockchainPayment(txHash, invoiceId, securityMeta = {}) {
     try {
-        // Safe Check 1: Verify the invoice structure actually exists
         const invoice = await Invoice.findById(invoiceId);
         if (!invoice) {
             return { success: false, message: "Target invoice structure not found." };
@@ -95,25 +113,35 @@ export async function processBlockchainPayment(txHash, invoiceId) {
 
         // Safe Check 2: Check settlement status to block double spending attempts
         if (invoice.status === 'SETTLED') {
+            await AuditLog.create({
+                eventType: 'ATTACK_BLOCKED',
+                description: `CRITICAL: Double Spend Intercepted! Exploit attempt on Invoice ID: ${invoiceId}`,
+                ipAddress: securityMeta.ip,
+                userAgent: securityMeta.userAgent
+            });
             return { success: false, message: "Transaction blocked: Invoice already settled globally." };
         }
 
         // Safe Check 3: Prevent duplicate transaction hash submission
         const existingTx = await Transaction.findOne({ blockchainHash: txHash });
         if (existingTx) {
+            await AuditLog.create({
+                eventType: 'ATTACK_BLOCKED',
+                description: `CRITICAL: Replay Attack Intercepted! Duplicate blockchain hash: ${txHash}`,
+                ipAddress: securityMeta.ip,
+                userAgent: securityMeta.userAgent
+            });
             return { success: false, message: "Transaction blocked: Ledger hash already executed." };
         }
 
-        // Financial Calculation Logic
         const gross = invoice.amountUSD;
-        const platformFee = gross * 0.01; // 1% operational fee
+        const platformFee = gross * 0.01;
         const net = gross - platformFee;
         
         const localRate = FX_RATES[invoice.targetCurrency] || 1;
         const localPayoutAmount = (net * localRate).toFixed(2);
         const payoutString = `${localPayoutAmount} ${invoice.targetCurrency}`;
 
-        // Create the official immutable transaction ledger record
         const transaction = await Transaction.create({
             invoiceId: invoice._id,
             blockchainHash: txHash,
@@ -123,22 +151,14 @@ export async function processBlockchainPayment(txHash, invoiceId) {
             payoutLocal: payoutString
         });
 
-        // Update the foundational invoice status securely
         invoice.status = 'SETTLED';
         invoice.settledAt = new Date();
         invoice.txHash = txHash;
         await invoice.save();
 
-        // Atomically update global platform analytics counters
         const updatedAnalytics = await Analytics.findOneAndUpdate(
             { company: 'CreativePay' },
-            { 
-                $inc: { 
-                    totalVolumeUSD: gross, 
-                    totalFeesCollectedUSD: platformFee, 
-                    processedPayoutsCount: 1 
-                } 
-            },
+            { $inc: { totalVolumeUSD: gross, totalFeesCollectedUSD: platformFee, processedPayoutsCount: 1 } },
             { new: true }
         );
 
@@ -148,11 +168,19 @@ export async function processBlockchainPayment(txHash, invoiceId) {
             db.analytics.processedPayoutsCount = updatedAnalytics.processedPayoutsCount;
         }
 
+        // Log the successful compliance event immutably
+        await AuditLog.create({
+            eventType: 'PAYMENT_SETTLED',
+            description: `Assets Disbursed: Converted $${net.toFixed(2)} USD into ${payoutString}`,
+            ipAddress: securityMeta.ip,
+            userAgent: securityMeta.userAgent
+        });
+
         return { success: true, transaction };
 
     } catch (err) {
         console.error("Secure Settlement Routine Failure:", err);
         return { success: false, message: "Internal ledger processing anomaly occurred." };
     }
-                            }
-  
+    }
+        
