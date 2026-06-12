@@ -174,7 +174,8 @@
         async function fetchAuditTrail() {
             try {
                 const res = await fetch(`${HOST}/api/audit-trail`);
-                const logs = await res.getReader ? [] : await res.json();
+                if (!res.ok) return;
+                const logs = await res.json();
                 if (!Array.isArray(logs)) return;
                 
                 const timeline = document.getElementById("timeline-window");
@@ -237,3 +238,4 @@
                 if (data.transaction) {
                     document.getElementById("ledger-status").innerText = "SETTLED / ASSETS DISBURSED";
                     document.getElementById("ledger-status").style.color = "#7ee787";
+    
