@@ -15,10 +15,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ENTERPRISE PROXIMAL OVERRIDE FOR RENDER DEPLOYMENTS
-app.set('trust proxy', 1); // Automatically instructs Express to fetch true client IPs from Render routing masks
+app.set('trust proxy', 1);
 
-// ENTERPRISE PERIMETER SECURITY HOOKS
-app.use(helmet({ contentSecurityPolicy: false }));
+// ENTERPRISE PERIMETER SECURITY HOOKS - FIXED FOR MOBILE BROWSER COMPATIBILITY
+app.use(helmet({
+    contentSecurityPolicy: false,       // Completely disables strict browser blockades during development testing
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false
+}));
+
 app.use(cors());
 app.use(express.json());
 
@@ -87,7 +92,6 @@ app.get('/api/analytics', (req, res) => {
 // COMPLIANCE ENGINE TIMELINE STREAM ENDPOINT
 app.get('/api/audit-trail', async (req, res) => {
     try {
-        // Fetch the 10 most recent global compliance events
         const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(10);
         res.status(200).json(logs);
     } catch (err) {
