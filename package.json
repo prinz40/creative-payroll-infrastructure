@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "start:v2": "node server-v2.js"
+    "start:v2": "node ./server-v2.js --fresh-cache-clear"
   },
   "dependencies": {
     "cors": "^2.8.5",
