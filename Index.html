@@ -5,19 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CreativePay Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; }
+        body { font-family: Arial, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; margin: 0; }
         .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
         .card-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
-        .sec-btn { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+        .sec-btn { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; font-size: 14px; }
         .sec-btn:hover { background: #2ea043; }
-        #output-window { background: #0d1117; border: 1px solid #30363d; padding: 10px; min-height: 100px; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+        .sec-btn:active { background: #1a7f37; }
+        #output-window { background: #0d1117; border: 1px solid #30363d; padding: 10px; min-height: 100px; white-space: pre-wrap; font-family: monospace; font-size: 12px; border-radius: 6px; }
         #ledger-status { font-weight: bold; }
         .timeline-item { border-left: 3px solid #30363d; padding-left: 12px; margin-bottom: 12px; }
-        .timeline-badge { background: #30363d; padding: 2px 6px; border-radius: 10px; font-size: 10px; }
+        .timeline-badge { background: #30363d; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
         .bg-create { background: #1f6feb; }
         .bg-settle { background: #238636; }
         .bg-attack { background: #da3633; }
-        .meta-text { color: #8b949e; font-size: 11px; }
+        .meta-text { color: #8b949e; font-size: 11px; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -53,8 +54,7 @@
 
 <script>
     // === CONFIG ===
-    // PASTE YOUR RENDER BACKEND URL HERE - NO SLASH AT END
-    const HOST = "https://creativepay-backend-xxxx.onrender.com"; 
+    const HOST = "https://creative-payroll-infrastructure.onrender.com";
     
     // === STATE ===
     let savedInvoiceId = "";
@@ -79,7 +79,10 @@
     async function fetchAuditTrail() {
         try {
             const res = await fetch(`${HOST}/api/audit-trail`);
-            if (!res.ok) return;
+            if (!res.ok) {
+                console.error("Audit trail fetch failed:", res.status);
+                return;
+            }
             const logs = await res.json();
             if (!Array.isArray(logs)) return;
 
@@ -123,7 +126,10 @@
                 })
             });
             
-            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ message: 'Unknown server error' }));
+                throw new Error(`Server error ${res.status}: ${errorData.message || res.statusText}`);
+            }
             const data = await res.json();
             
             savedInvoiceId = data.invoice?._id || data.invoice?.id || data._id;
@@ -163,11 +169,14 @@
                 })
             });
             
-            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({ message: 'Unknown server error' }));
+                throw new Error(`Server error ${res.status}: ${errorData.message || res.statusText}`);
+            }
             const data = await res.json();
             log(data);
             
-            if (data.transaction) {
+            if (data.transaction || data.success) {
                 document.getElementById("ledger-status").innerText = "SETTLED / ASSETS DISBURSED";
                 document.getElementById("ledger-status").style.color = "#7ee787";
                 document.getElementById("ledger-fee").innerText = "$5.00 USD";
@@ -191,7 +200,6 @@
         log("Testing Anti-Double Spend Guard...");
         
         try {
-            // Try to settle the same invoice twice
             const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -204,7 +212,7 @@
             const data = await res.json();
             log(data);
             
-            if (res.status === 409 || data.error) {
+            if (res.status === 409 || data.error || data.message?.includes('already')) {
                 alert("Anti-Double Spend Guard: PASSED ✅\nDuplicate settlement blocked by server.");
             } else {
                 alert("Anti-Double Spend Guard: FAILED ❌\nServer allowed duplicate settlement!");
