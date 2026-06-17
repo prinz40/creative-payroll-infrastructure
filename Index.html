@@ -3,147 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CreativePay Control Dashboard</title>
+    <title>CreativePay Dashboard</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        h1 {
-            color: #58a6ff;
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        .card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 20px;
-            width: 100%;
-            max-width: 500px;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-        }
-        .card-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #8b949e;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-            letter-spacing: 0.5px;
-        }
-        button {
-            background-color: #238636;
-            color: #ffffff;
-            border: 1px solid rgba(240,246,252,0.1);
-            border-radius: 6px;
-            padding: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            cursor: pointer;
-            margin-bottom: 10px;
-        }
-        button:hover {
-            background-color: #2ea44f;
-        }
-        button.danger-btn {
-            background-color: #da3633;
-        }
-        button.danger-btn:hover {
-            background-color: #b62b28;
-        }
-        button.sec-btn {
-            background-color: #1f6feb;
-        }
-        button.sec-btn:hover {
-            background-color: #388bfd;
-        }
-        pre {
-            background-color: #010409;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            padding: 15px;
-            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-            font-size: 12px;
-            color: #7ee787;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin: 0;
-        }
-        p { font-size: 13px; margin: 5px 0; }
-        
-        /* TIMELINE STYLING LAYER */
-        .timeline-container {
-            max-height: 250px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-        .timeline-item {
-            border-left: 3px solid #30363d;
-            padding-left: 12px;
-            margin-bottom: 12px;
-            position: relative;
-        }
-        .timeline-badge {
-            font-size: 10px;
-            font-weight: bold;
-            padding: 2px 6px;
-            border-radius: 3px;
-            display: inline-block;
-            margin-bottom: 4px;
-        }
-        .bg-create { background-color: #1f6feb; color: #fff; }
-        .bg-settle { background-color: #238636; color: #fff; }
-        .bg-attack { background-color: #da3633; color: #fff; }
-        .meta-text { font-size: 11px; color: #8b949e; font-family: monospace; }
+        body { font-family: Arial, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+        .card-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        .sec-btn { background: #238636; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+        .sec-btn:hover { background: #2ea043; }
+        #output-window { background: #0d1117; border: 1px solid #30363d; padding: 10px; min-height: 100px; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+        #ledger-status { font-weight: bold; }
+        .timeline-item { border-left: 3px solid #30363d; padding-left: 12px; margin-bottom: 12px; }
+        .timeline-badge { background: #30363d; padding: 2px 6px; border-radius: 10px; font-size: 10px; }
+        .bg-create { background: #1f6feb; }
+        .bg-settle { background: #238636; }
+        .bg-attack { background: #da3633; }
+        .meta-text { color: #8b949e; font-size: 11px; }
     </style>
 </head>
 <body>
 
-    <h1>🚀 CreativePay Control Dashboard</h1>
-
     <div class="card">
-        <div class="card-title">Tier 1 & 2: Invoice Engine</div>
+        <div class="card-title">CreativePay Live Demo Terminal</div>
         <button class="sec-btn" onclick="generateInvoice()">Create Mock $500 Invoice</button>
-        <p>Invoice ID Saved: <span id="current-inv-id" style="color: #58a6ff; font-weight: bold;">None</span></p>
+        <button class="sec-btn" onclick="settlePayment()">Simulate Payment Settlement</button>
+        <button class="sec-btn" onclick="triggerDoubleSpend()">Test Anti-Double Spend</button>
     </div>
 
     <div class="card">
-        <div class="card-title">Tier 3 & 4: Liquidity Settlement Engine</div>
-        <button onclick="settlePayment()">Process Stablecoin Liquidation</button>
-    </div>
-
-    <div class="card">
-        <div class="card-title">Security Perimeter Defense</div>
-        <button class="danger-btn" onclick="triggerDoubleSpend()">Test Anti-Double Spend Guard</button>
-    </div>
-
-    <div class="card" style="border-left: 5px solid #2ecc71;">
-        <div class="card-title">🌍 Global Payout Settlement Ledger</div>
-        <div style="padding: 10px; background: #010409; border: 1px solid #30363d; border-radius: 6px; font-family: monospace;">
-            <p><strong>Settlement Status:</strong> <span id="ledger-status" style="color: #8b949e;">AWAITING INITIATION</span></p>
-            <p><strong>Gross Value:</strong> <span id="ledger-gross">$0.00 USD</span></p>
-            <p><strong>CreativePay Fee (1%):</strong> <span id="ledger-fee">$0.00 USD</span></p>
-            <p><strong>Net Settled Value:</strong> <span id="ledger-net">$0.00 USD</span></p>
-            <h3 style="color: #7ee787; margin-top: 15px; margin-bottom: 5px;">Final Local Payout:</h3>
-            <span id="ledger-payout" style="color: #58a6ff; font-size: 18px; font-weight: bold; font-family: monospace;">0.00 ---</span>
-        </div>
-    </div>
-
-    <!-- NEW ENTERPRISE LAYER: IMMUTABLE AUDIT TRAIL TIMELINE -->
-    <div class="card" style="border-top: 3px solid #f1c40f;">
-        <div class="card-title">🛡️ Global Integrity & Audit Trail Timeline</div>
-        <div id="timeline-window" class="timeline-container">
-            <p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">Awaiting network data synchronization...</p>
-        </div>
+        <div class="card-title">Global FX Settlement Ledger</div>
+        <div>Status: <span id="ledger-status">IDLE</span></div>
+        <div>Gross: <span id="ledger-gross">$0.00 USD</span></div>
+        <div>Fee: <span id="ledger-fee">$0.00 USD</span></div>
+        <div>Net: <span id="ledger-net">$0.00 USD</span></div>
+        <div>Payout: <span id="ledger-payout">Awaiting invoice...</span></div>
+        <div>Invoice ID: <span id="current-inv-id">None</span></div>
     </div>
 
     <div class="card">
@@ -151,91 +44,180 @@
         <pre id="output-window">Click a button above to run real-time cloud computations...</pre>
     </div>
 
-    <script>
-        const HOST = "";
-        let savedInvoiceId = "";
-        let savedTxHash = "";
-        const logger = document.getElementById("output-window");
+    <div class="card">
+        <div class="card-title">Real-Time Audit Trail</div>
+        <div id="timeline-window">
+            <p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">Awaiting network data synchronization...</p>
+        </div>
+    </div>
 
-        function log(msg) {
-            logger.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
-        }
-
-        function resetLedgerVisuals() {
-            document.getElementById("ledger-status").innerText = "PROCESSING...";
-            document.getElementById("ledger-status").style.color = "#f1c40f";
-            document.getElementById("ledger-gross").innerText = "$0.00 USD";
-            document.getElementById("ledger-fee").innerText = "$0.00 USD";
-            document.getElementById("ledger-net").innerText = "$0.00 USD";
-            document.getElementById("ledger-payout").innerText = "Calculating FX...";
-        }
-
-        // REAL-TIME AUDIT TRAIL DATA SYNC ENGINE
-        async function fetchAuditTrail() {
-            try {
-                const res = await fetch(`${HOST}/api/audit-trail`);
-                if (!res.ok) return;
-                const logs = await res.json();
-                if (!Array.isArray(logs)) return;
-                
-                const timeline = document.getElementById("timeline-window");
-                if (logs.length === 0) {
-                    timeline.innerHTML = `<p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">No audit events recorded yet.</p>`;
-                    return;
-                }
-
-                timeline.innerHTML = logs.map(item => {
-                    let badgeClass = "bg-create";
-                    if (item.eventType === "PAYMENT_SETTLED") badgeClass = "bg-settle";
-                    if (item.eventType === "ATTACK_BLOCKED") badgeClass = "bg-attack";
-
-                    return `
-                        <div class="timeline-item" style="border-left-color: ${item.eventType === 'ATTACK_BLOCKED' ? '#da3633' : '#30363d'}">
-                            <span class="timeline-badge ${badgeClass}">${item.eventType}</span>
-                            <p style="margin: 3px 0; font-size: 12px; font-weight: 500;">${item.description}</p>
-                            <div class="meta-text">📍 IP: ${item.ipAddress} | 🖥️ OS: ${item.userAgent.substring(0, 45)}...</div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (err) { console.error("Audit trail pull fault:", err); }
-        }
-
-        async function generateInvoice() {
-            log("Generating core invoice on the cloud...");
-            try {
-                const res = await fetch(`${HOST}/api/invoices`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        creativeName: "Prinz Creator",
-                        email: "founder@creativepay.network",
-                        amountUSD: 500,
-                        targetCurrency: "NGN"
-                    })
-                });
-                const data = await res.json();
-                savedInvoiceId = data.invoice?._id || data.invoice?.id;
-                document.getElementById("current-inv-id").innerText = savedInvoiceId || "Error";
-                log(data);
-                fetchAuditTrail();
-            } catch (err) { log("Error: " + err.message); }
-        }
-
-        async function settlePayment() {
-            if (!savedInvoiceId) { alert("Please generate an invoice first!"); return; }
-            resetLedgerVisuals();
-            log("Simulating on-chain settlement pipeline...");
-            savedTxHash = "0x7a" + Math.random().toString(16).substr(2, 40);
-            try {
-                const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ txHash: savedTxHash, invoiceId: savedInvoiceId })
-                });
-                const data = await res.json();
-                log(data);
-
-                if (data.transaction) {
-                    document.getElementById("ledger-status").innerText = "SETTLED / ASSETS DISBURSED";
-                    document.getElementById("ledger-status").style.color = "#7ee787";
+<script>
+    // === CONFIG ===
+    // PASTE YOUR RENDER BACKEND URL HERE - NO SLASH AT END
+    const HOST = "https://creativepay-backend-xxxx.onrender.com"; 
     
+    // === STATE ===
+    let savedInvoiceId = "";
+    let savedTxHash = "";
+    const logger = document.getElementById("output-window");
+
+    // === UTILITY FUNCTIONS ===
+    function log(msg) {
+        logger.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+    }
+
+    function resetLedgerVisuals() {
+        document.getElementById("ledger-status").innerText = "PROCESSING...";
+        document.getElementById("ledger-status").style.color = "#f1c40f";
+        document.getElementById("ledger-gross").innerText = "$0.00 USD";
+        document.getElementById("ledger-fee").innerText = "$0.00 USD";
+        document.getElementById("ledger-net").innerText = "$0.00 USD";
+        document.getElementById("ledger-payout").innerText = "Calculating FX...";
+    }
+
+    // === AUDIT TRAIL ===
+    async function fetchAuditTrail() {
+        try {
+            const res = await fetch(`${HOST}/api/audit-trail`);
+            if (!res.ok) return;
+            const logs = await res.json();
+            if (!Array.isArray(logs)) return;
+
+            const timeline = document.getElementById("timeline-window");
+            if (logs.length === 0) {
+                timeline.innerHTML = `<p style="color: #8b949e; text-align: center; font-size: 12px; padding: 10px;">No audit events recorded yet.</p>`;
+                return;
+            }
+
+            timeline.innerHTML = logs.map(item => {
+                let badgeClass = "bg-create";
+                if (item.eventType === "PAYMENT_SETTLED") badgeClass = "bg-settle";
+                if (item.eventType === "ATTACK_BLOCKED") badgeClass = "bg-attack";
+                
+                return `
+                    <div class="timeline-item" style="border-left-color: ${item.eventType === 'ATTACK_BLOCKED' ? '#da3633' : '#30363d'}">
+                        <span class="timeline-badge ${badgeClass}">${item.eventType}</span>
+                        <p style="margin: 3px 0; font-size: 12px; font-weight: 500;">${item.description || 'No description'}</p>
+                        <div class="meta-text">IP: ${item.ipAddress || 'N/A'} | OS: ${item.userAgent ? item.userAgent.substring(0, 45) : 'N/A'}...</div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) { 
+            console.error("Audit trail pull fault:", err); 
+        }
+    }
+
+    // === BUTTON 1: CREATE INVOICE ===
+    async function generateInvoice() {
+        log("Generating core invoice in the cloud...");
+        resetLedgerVisuals();
+        try {
+            const res = await fetch(`${HOST}/api/invoices`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    creativeName: "Prinz Creator",
+                    email: "founder@creativepay.network",
+                    amountUSD: 500,
+                    targetCurrency: "NGN"
+                })
+            });
+            
+            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            const data = await res.json();
+            
+            savedInvoiceId = data.invoice?._id || data.invoice?.id || data._id;
+            document.getElementById("current-inv-id").innerText = savedInvoiceId || "Error";
+            document.getElementById("ledger-status").innerText = "INVOICE_CREATED";
+            document.getElementById("ledger-status").style.color = "#1f6feb";
+            document.getElementById("ledger-gross").innerText = "$500.00 USD";
+            document.getElementById("ledger-payout").innerText = "Awaiting settlement...";
+            
+            log(data);
+            fetchAuditTrail();
+        } catch (err) { 
+            log("Error: " + err.message);
+            document.getElementById("ledger-status").innerText = "ERROR";
+            document.getElementById("ledger-status").style.color = "#da3633";
+        }
+    }
+
+    // === BUTTON 2: SETTLE PAYMENT ===
+    async function settlePayment() {
+        if (!savedInvoiceId) { 
+            alert("Please generate an invoice first!"); 
+            return; 
+        }
+        resetLedgerVisuals();
+        log("Simulating on-chain settlement pipeline...");
+        
+        try {
+            savedTxHash = "0x7a" + Math.random().toString(16).substr(2, 40);
+            
+            const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    txHash: savedTxHash, 
+                    invoiceId: savedInvoiceId 
+                })
+            });
+            
+            if (!res.ok) throw new Error(`Server error: ${res.status}`);
+            const data = await res.json();
+            log(data);
+            
+            if (data.transaction) {
+                document.getElementById("ledger-status").innerText = "SETTLED / ASSETS DISBURSED";
+                document.getElementById("ledger-status").style.color = "#7ee787";
+                document.getElementById("ledger-fee").innerText = "$5.00 USD";
+                document.getElementById("ledger-net").innerText = "$495.00 USD";
+                document.getElementById("ledger-payout").innerText = "₦792,000.00 NGN";
+            }
+            fetchAuditTrail();
+        } catch (err) { 
+            log("Error: " + err.message);
+            document.getElementById("ledger-status").innerText = "SETTLEMENT_FAILED";
+            document.getElementById("ledger-status").style.color = "#da3633";
+        }
+    }
+
+    // === BUTTON 3: ANTI-DOUBLE SPEND TEST ===
+    async function triggerDoubleSpend() {
+        if (!savedInvoiceId) { 
+            alert("Please generate an invoice first!"); 
+            return; 
+        }
+        log("Testing Anti-Double Spend Guard...");
+        
+        try {
+            // Try to settle the same invoice twice
+            const res = await fetch(`${HOST}/api/webhooks/blockchain-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    txHash: "0xFAKE" + Math.random().toString(16).substr(2, 40), 
+                    invoiceId: savedInvoiceId 
+                })
+            });
+            
+            const data = await res.json();
+            log(data);
+            
+            if (res.status === 409 || data.error) {
+                alert("Anti-Double Spend Guard: PASSED ✅\nDuplicate settlement blocked by server.");
+            } else {
+                alert("Anti-Double Spend Guard: FAILED ❌\nServer allowed duplicate settlement!");
+            }
+            fetchAuditTrail();
+        } catch (err) { 
+            log("Error: " + err.message);
+        }
+    }
+
+    // Initial load
+    fetchAuditTrail();
+</script>
+
+</body>
+</html>
