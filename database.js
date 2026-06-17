@@ -1,215 +1,156 @@
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+// CreativePay In-Memory Database Layer
+// Handles Users, Invoices, Audit Logs, Analytics
 
-dotenv.config();
-
-const MONGO_URI = process.env.MONGO_URI;
-
-// Core Supported Settlement Corridors & Simulated Liquidity FX Rates
-export const FX_RATES = {
-  NGN: 1500.00, // Nigerian Naira
-  GHS: 14.50,   // Ghanaian Cedi
-  KES: 130.00   // Kenyan Shilling
-};
-
-// ==========================================
-// 1. ENTERPRISE MONGODB SCHEMA DEFINITIONS
-// ==========================================
-
-const InvoiceSchema = new mongoose.Schema({
-  creativeName: { type: String, required: true },
-  email: { type: String, required: true },
-  amountUSD: { type: Number, required: true },
-  targetCurrency: { type: String, default: 'NGN' },
-  status: { type: String, default: 'PENDING', enum: ['PENDING', 'SETTLED'] },
-  createdAt: { type: Date, default: Date.now },
-  settledAt: { type: Date },
-  txHash: { type: String }
-});
-
-const TransactionSchema = new mongoose.Schema({
-  invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', required: true },
-  blockchainHash: { type: String, required: true, unique: true },
-  grossUSD: { type: Number, required: true },
-  platformFeeUSD: { type: Number, required: true },
-  netUSD: { type: Number, required: true },
-  payoutLocal: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
-const AnalyticsSchema = new mongoose.Schema({
-  company: { type: String, default: 'CreativePay', unique: true },
-  totalVolumeUSD: { type: Number, default: 0 },
-  totalFeesCollectedUSD: { type: Number, default: 0 },
-  processedPayoutsCount: { type: Number, default: 0 }
-});
-
-// Compile Models
-const Invoice = mongoose.model('Invoice', InvoiceSchema);
-const Transaction = mongoose.model('Transaction', TransactionSchema);
-const Analytics = mongoose.model('Analytics', AnalyticsSchema);
-
-// Export dynamic mock database reference for analytics visibility compatibility
+// === CORE DB STORE ===
 export const db = {
-  analytics: { totalVolumeUSD: 0, totalFeesCollectedUSD: 0, processedPayoutsCount: 0 }
+  users: [],
+  invoices: [],
+  audit: [],
+  analytics: {
+    totalInvoices: 0,
+    settledInvoices: 0,
+    totalVolumeUSD: 0,
+    totalFeesUSD: 0
+  }
 };
 
-// ==========================================
-// 2. ADVANCED CLUSTER LIFECYCLE MANAGER
-// ==========================================
-
-if (!MONGO_URI) {
-  console.error("❌ High Alert: MONGO_URI environment variable is missing on Render!");
-} else {
-  mongoose.connect(MONGO_URI)
-    .then(() => {
-      console.log("🟩 Linked to CreativePay Cloud Database Cluster Successfully");
-      initializeAnalyticsSeed();
-    })
-    .catch((err) => {
-      console.error("❌ Database Cluster Connection Crash:", err.message);
-    });
+// === USER HELPERS ===
+export function findUserByEmail(email) {
+  return db.users.find(user => user.email === email.toLowerCase()) || null;
 }
 
-// Ensure global analytics metric tracking record exists inside the cluster
-async function initializeAnalyticsSeed() {
-  try {
-    let record = await Analytics.findOne({ company: 'CreativePay' });
-    if (!record) {
-      record = await Analytics.create({ company: 'CreativePay' });
-    }
-    // Keep local dynamic variable tracking perfectly synchronized in real-time
-    db.analytics.totalVolumeUSD = record.totalVolumeUSD;
-    db.analytics.totalFeesCollectedUSD = record.totalFeesCollectedUSD;
-    db.analytics.processedPayoutsCount = record.processedPayoutsCount;
-  } catch (err) {
-    console.error("Failed to seed analytics:", err.message);
-  }
+export function findUserById(userId) {
+  return db.users.find(user => user.id === userId) || null;
 }
 
-// ==========================================
-// 3. ENTERPRISE DATA MUTATION CODES
-// ==========================================
-
-/**
- * Inserts a structured invoice model into the cloud cluster
- */
-export async function createInvoice(invoiceData) {
-  try {
-    const newInvoice = new Invoice({
-      creativeName: invoiceData.creativeName,
-      email: invoiceData.email,
-      amountUSD: parseFloat(invoiceData.amountUSD) || 0,
-      targetCurrency: invoiceData.targetCurrency || 'NGN'
-    });
-    
-    await newInvoice.save();
-    
-    return {
-      id: newInvoice._id.toString(),
-      creativeName: newInvoice.creativeName,
-      email: newInvoice.email,
-      amountUSD: newInvoice.amountUSD,
-      targetCurrency: newInvoice.targetCurrency,
-      status: newInvoice.status,
-      createdAt: newInvoice.createdAt
-    };
-  } catch (err) {
-    console.error("Invoice insertion error:", err.message);
-    throw err;
-  }
+export function addUser(userData) {
+  const user = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    email: userData.email.toLowerCase(),
+    password: userData.password, // Already hashed from server.js
+    creativeName: userData.creativeName,
+    mobileMoneyNumber: userData.mobileMoneyNumber || '',
+    mobileMoneyProvider: userData.mobileMoneyProvider || 'None',
+    country: userData.country || 'NGN',
+    role: userData.role || 'creator',
+    createdAt: new Date()
+  };
+  db.users.push(user);
+  return user;
 }
 
-/**
- * Executes multi-tier stablecoin liquidations with cloud atomic updates
- */
+// === INVOICE LOGIC ===
+export async function createInvoice({ creativeName, email, amountUSD, targetCurrency, userId }) {
+  const invoice = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    userId: userId,
+    creativeName: creativeName,
+    email: email,
+    amountUSD: parseFloat(amountUSD),
+    targetCurrency: targetCurrency || 'NGN',
+    status: 'Created',
+    txHash: null,
+    createdAt: new Date(),
+    settledAt: null,
+    feeUSD: parseFloat(amountUSD) * 0.01, // 1% flat fee
+    netUSD: parseFloat(amountUSD) * 0.99
+  };
+
+  db.invoices.push(invoice);
+  db.analytics.totalInvoices += 1;
+  
+  return invoice;
+}
+
+export function findInvoiceById(invoiceId) {
+  return db.invoices.find(inv => inv.id === invoiceId) || null;
+}
+
+export function getUserInvoices(userId) {
+  return db.invoices.filter(inv => inv.userId === userId).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// === BLOCKCHAIN SETTLEMENT ===
 export async function processBlockchainPayment(txHash, invoiceId) {
-  try {
-    // 1. Structural Sanity Validation
-    if (!txHash || !invoiceId || typeof txHash !== 'string' || typeof invoiceId !== 'string') {
-      return { success: false, message: "Invalid payload parameters provided" };
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
-      return { success: false, message: "Invoice target format is structurally invalid" };
-    }
-
-    // 2. Locate Target Invoice
-    const invoice = await Invoice.findById(invoiceId);
-    if (!invoice) {
-      return { success: false, message: "Invoice target not found" };
-    }
-
-    // 3. State Machine Guard (Idempotency Check)
-    if (invoice.status === 'SETTLED') {
-      return { success: false, message: "Invoice already settled" };
-    }
-
-    // 4. Cryptographic Double-Spend Guard (Enforced by cloud indexing)
-    const duplicateTx = await Transaction.findOne({ blockchainHash: txHash });
-    if (duplicateTx) {
-      return { success: false, message: "Security Alert: Duplicate blockchain transaction hash detected" };
-    }
-
-    // 5. Calculate Infrastructure Monetization Model (1% Flat Settlement Fee)
-    const feeUSD = invoice.amountUSD * 0.01;
-    const netAmountUSD = invoice.amountUSD - feeUSD;
-
-    // 6. Calculate FX Liquidation Pipeline Conversion
-    const fxRate = FX_RATES[invoice.targetCurrency] || 1.0;
-    const payoutLocalAmount = netAmountUSD * fxRate;
-
-    // 7. Atomic State Transition
-    invoice.status = 'SETTLED';
-    invoice.settledAt = new Date();
-    invoice.txHash = txHash;
-    await invoice.save();
-
-    // 8. Update Venture Capital Analytics Metrics in Cloud Database
-    const updatedAnalytics = await Analytics.findOneAndUpdate(
-      { company: 'CreativePay' },
-      { 
-        $inc: { 
-          totalVolumeUSD: invoice.amountUSD, 
-          totalFeesCollectedUSD: feeUSD, 
-          processedPayoutsCount: 1 
-        } 
-      },
-      { new: true, upsert: true }
-    );
-
-    // Keep dynamic tracker perfectly synchronized in memory for endpoints
-    db.analytics.totalVolumeUSD = updatedAnalytics.totalVolumeUSD;
-    db.analytics.totalFeesCollectedUSD = updatedAnalytics.totalFeesCollectedUSD;
-    db.analytics.processedPayoutsCount = updatedAnalytics.processedPayoutsCount;
-
-    // 9. Generate Immutable Audit Ledger Record
-    const transactionRecord = new Transaction({
-      invoiceId: invoice._id,
-      blockchainHash: txHash,
-      grossUSD: invoice.amountUSD,
-      platformFeeUSD: feeUSD,
-      netUSD: netAmountUSD,
-      payoutLocal: `${payoutLocalAmount.toFixed(2)} ${invoice.targetCurrency}`
-    });
-
-    await transactionRecord.save();
-
-    return { 
-      success: true, 
-      transaction: {
-        id: transactionRecord._id.toString(),
-        invoiceId: invoice._id.toString(),
-        blockchainHash: txHash,
-        grossUSD: transactionRecord.grossUSD,
-        platformFeeUSD: transactionRecord.platformFeeUSD,
-        netUSD: transactionRecord.netUSD,
-        payoutLocal: transactionRecord.payoutLocal,
-        timestamp: transactionRecord.timestamp
-      }
-    };
-  } catch (err) {
-    console.error("Blockchain processing error:", err.message);
-    return { success: false, message: "Internal cloud server runtime fault occurred" };
+  const invoice = findInvoiceById(invoiceId);
+  
+  if (!invoice) {
+    return { success: false, message: 'Invoice not found' };
   }
-            }
+  
+  if (invoice.status === 'Settled') {
+    return { success: false, message: 'Invoice already settled. Anti-Double Spend Guard activated' };
+  }
+
+  // Simulate blockchain verification delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Update invoice
+  invoice.status = 'Settled';
+  invoice.txHash = txHash;
+  invoice.settledAt = new Date();
+
+  // Update analytics
+  db.analytics.settledInvoices += 1;
+  db.analytics.totalVolumeUSD += invoice.amountUSD;
+  db.analytics.totalFeesUSD += invoice.feeUSD;
+
+  // Mock mobile money payout calculation
+  const fxRates = { NGN: 1584, GHS: 12.5, KES: 129 };
+  const rate = fxRates[invoice.targetCurrency] || 1584;
+  const payoutAmount = invoice.netUSD * rate;
+
+  const transaction = {
+    invoiceId: invoice.id,
+    txHash: txHash,
+    grossUSD: invoice.amountUSD,
+    feeUSD: invoice.feeUSD,
+    netUSD: invoice.netUSD,
+    payoutAmount: payoutAmount,
+    payoutCurrency: invoice.targetCurrency,
+    mobileMoneyRef: 'MM' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+    timestamp: new Date()
+  };
+
+  return { success: true, transaction };
+}
+
+// === AUDIT LOG ===
+export function addAuditLog({ eventType, description, ipAddress, userAgent, invoiceId, userId }) {
+  const log = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    eventType,
+    description,
+    ipAddress: ipAddress || 'Unknown',
+    userAgent: userAgent || 'Unknown',
+    invoiceId: invoiceId || null,
+    userId: userId || null,
+    timestamp: new Date()
+  };
+  
+  db.audit.push(log);
+  return log;
+}
+
+export function getUserAuditLogs(userId, limit = 50) {
+  return db.audit
+   .filter(log => log.userId === userId)
+   .sort((a, b) => b.timestamp - a.timestamp)
+   .slice(0, limit);
+}
+
+// === ANALYTICS ===
+export function getAnalytics() {
+  const conversionRate = db.analytics.totalInvoices > 0 
+    ? (db.analytics.settledInvoices / db.analytics.totalInvoices * 100).toFixed(2)
+    : 0;
+    
+  return {
+    ...db.analytics,
+    conversionRate: parseFloat(conversionRate)
+  };
+}
+
+// === INIT ===
+console.log('CreativePay Database Layer Initialized');
+console.log(`Users: ${db.users.length} | Invoices: ${db.invoices.length}`);
