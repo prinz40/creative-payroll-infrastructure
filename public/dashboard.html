@@ -6,66 +6,102 @@
   <title>CreativePay Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
+    body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a; color: #e2e8f0; padding: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
     }
-   .container { max-width: 800px; margin: 40px auto; }
-    h1 { color: #38bdf8; margin-bottom: 10px; }
-   .card { 
-      background: #1e293b; padding: 30px; border-radius: 12px; 
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
+   .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
     }
-   .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-    button { 
-      padding: 10px 20px; background: #ef4444; color: white;
-      border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
+   .title {
+      color: #38bdf8;
+      font-size: 24px;
+      font-weight: 700;
     }
-   .balance { font-size: 48px; font-weight: 700; color: #4ade80; margin: 20px 0; }
-   .label { color: #94a3b8; font-size: 14px; }
+   .logout {
+      background: #ef4444;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+   .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+   .label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+   .value {
+      font-size: 20px;
+      font-weight: 600;
+    }
+   .balance {
+      font-size: 32px;
+      color: #10b981;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>CreativePay Dashboard</h1>
-      <button onclick="logout()">Logout</button>
-    </div>
-    
-    <div class="card">
-      <div class="label">Welcome back,</div>
-      <h2 id="userName">Loading...</h2>
-    </div>
+  <div class="header">
+    <div class="title">CreativePay Dashboard</div>
+    <button class="logout" onclick="logout()">Logout</button>
+  </div>
 
-    <div class="card">
-      <div class="label">Account Balance</div>
-      <div class="balance">₦0.00</div>
-    </div>
+  <div class="card">
+    <div class="label">Welcome back,</div>
+    <div class="value" id="userName">Loading...</div>
+  </div>
 
-    <div class="card">
-      <div class="label">Email</div>
-      <div id="userEmail">Loading...</div>
-    </div>
+  <div class="card">
+    <div class="label">Account Balance</div>
+    <div class="balance" id="userBalance">₦0.00</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Email</div>
+    <div class="value" id="userEmail">Loading...</div>
   </div>
 
   <script>
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/';
-    }
-
+    // Decode JWT to get user info
     function parseJwt(token) {
       try {
-        return JSON.parse(atob(token.split('.')[1]));
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
       } catch (e) {
         return null;
       }
     }
 
-    const user = parseJwt(token);
-    if (user) {
-      document.getElementById('userName').textContent = user.name || 'User';
-      document.getElementById('userEmail').textContent = user.email || 'N/A';
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/';
+    } else {
+      const userData = parseJwt(token);
+      if (userData) {
+        document.getElementById('userName').textContent = userData.name || 'User';
+        document.getElementById('userEmail').textContent = userData.email || 'No email';
+      } else {
+        logout();
+      }
     }
 
     function logout() {
