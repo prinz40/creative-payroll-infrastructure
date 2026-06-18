@@ -3,27 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay - Login</title>
+  <title>CreativePay - Secure Access</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
+    body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #0f172a; color: #e2e8f0; padding: 20px;
     }
     .container { max-width: 400px; margin: 40px auto; }
     h1 { text-align: center; margin-bottom: 30px; color: #38bdf8; }
-    .card { 
-      background: #1e293b; padding: 30px; border-radius: 12px; 
+    .card {
+      background: #1e293b; padding: 30px; border-radius: 12px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
     }
     .form-group { margin-bottom: 16px; }
     label { display: block; margin-bottom: 6px; font-size: 14px; color: #94a3b8; }
-    input, select { 
-      width: 100%; padding: 12px; background: #0f172a; 
+    input, select {
+      width: 100%; padding: 12px; background: #0f172a;
       border: 1px solid #334155; border-radius: 8px; color: #e2e8f0;
     }
     input:focus, select:focus { outline: none; border-color: #38bdf8; }
-    button { 
+    button {
       width: 100%; padding: 12px; background: #38bdf8; color: #0f172a;
       border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
     }
@@ -34,12 +34,17 @@
     .toggle { text-align: center; margin-top: 16px; font-size: 14px; }
     .toggle a { color: #38bdf8; cursor: pointer; text-decoration: none; }
     .hidden { display: none; }
+    .kyc-badge { 
+      background: #334155; padding: 8px 12px; border-radius: 6px; 
+      font-size: 12px; text-align: center; margin-bottom: 20px; 
+    }
+    .kyc-warning { background: #f59e0b; color: #0f172a; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>CreativePay</h1>
-    
+
     <!-- REGISTER FORM -->
     <div id="registerCard" class="card">
       <h2 style="margin-bottom: 20px; text-align: center;">Create Account</h2>
@@ -101,109 +106,65 @@
         No account? <a onclick="showRegister()">Create Account</a>
       </div>
     </div>
+
+    <!-- BVN VERIFICATION FORM - HIDDEN BY DEFAULT -->
+    <div id="bvnCard" class="card hidden">
+      <div class="kyc-badge kyc-warning">KYC Tier 1 Required</div>
+      <h2 style="margin-bottom: 20px; text-align: center;">Verify Your BVN</h2>
+      <p style="font-size: 14px; color: #94a3b8; margin-bottom: 20px; text-align: center;">
+        To comply with CBN regulations, verify your Bank Verification Number to unlock deposits and transfers.
+      </p>
+      <form id="bvnForm">
+        <div class="form-group">
+          <label>BVN - 11 Digits</label>
+          <input 
+            type="text" 
+            id="bvnInput" 
+            placeholder="Enter your 11-digit BVN" 
+            maxlength="11" 
+            pattern="\d{11}" 
+            required
+          >
+        </div>
+        <button type="submit" id="bvnButton">Verify BVN</button>
+        <div id="bvnMessage"></div>
+      </form>
+      <p style="font-size: 12px; margin-top: 16px; color: #64748b; text-align: center;">
+        🔒 Your BVN is encrypted and secure. We never store it in plain text.
+      </p>
+    </div>
+
   </div>
 
+  <!-- Load app.js - This contains all login, register, KYC logic -->
+  <script src="/app.js"></script>
+  
+  <!-- Small inline script for UI toggles only -->
   <script>
-    // Check if already logged in
-    if (localStorage.getItem('token')) {
-      window.location.href = '/dashboard.html';
-    }
-
-    // Toggle forms
+    // UI Toggle Functions
     function showLogin() {
       document.getElementById('registerCard').classList.add('hidden');
+      document.getElementById('bvnCard').classList.add('hidden');
       document.getElementById('loginCard').classList.remove('hidden');
     }
+    
     function showRegister() {
       document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('bvnCard').classList.add('hidden');
       document.getElementById('registerCard').classList.remove('hidden');
     }
+    
+    function showBVN() {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('registerCard').classList.add('hidden');
+      document.getElementById('bvnCard').classList.remove('hidden');
+    }
 
-    // REGISTER HANDLER
-    document.getElementById('registerForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const button = document.getElementById('regButton');
-      const message = document.getElementById('regMessage');
-      
-      button.disabled = true;
-      button.textContent = 'Creating...';
-      message.innerHTML = '';
-
-      const data = {
-        name: document.getElementById('regName').value,
-        email: document.getElementById('regEmail').value,
-        password: document.getElementById('regPassword').value,
-        phone: document.getElementById('regPhone').value,
-        provider: document.getElementById('regProvider').value,
-        country: document.getElementById('regCountry').value
-      };
-
-      try {
-        const response = await fetch('/api/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Registration failed');
-        }
-
-        message.innerHTML = '<div class="success">Account created! You can now login.</div>';
-        document.getElementById('registerForm').reset();
-        setTimeout(showLogin, 1500);
-        
-      } catch (error) {
-        message.innerHTML = `<div class="error">${error.message}</div>`;
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Create Account';
-      }
-    });
-
-    // LOGIN HANDLER - REDIRECT IS ENABLED
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const button = document.getElementById('loginButton');
-      const message = document.getElementById('loginMessage');
-      
-      button.disabled = true;
-      button.textContent = 'Logging in...';
-      message.innerHTML = '';
-
-      const data = {
-        email: document.getElementById('loginEmail').value,
-        password: document.getElementById('loginPassword').value
-      };
-
-      try {
-        const response = await fetch('/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Login failed');
-        }
-
-        localStorage.setItem('token', result.token);
-        message.innerHTML = '<div class="success">Login successful! Redirecting...</div>';
-        
-        // THIS LINE IS NOW ACTIVE - REDIRECTS TO DASHBOARD
-        setTimeout(() => {
-          window.location.href = '/dashboard.html';
-        }, 1000);
-        
-      } catch (error) {
-        message.innerHTML = `<div class="error">${error.message}</div>`;
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Login';
+    // Check if user should see BVN screen on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('kyc') === 'required') {
+        showBVN();
       }
     });
   </script>
