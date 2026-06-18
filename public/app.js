@@ -1,11 +1,25 @@
-// Configuration: Dynamically switches between local testing and cloud environment
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-  ? 'http://localhost:3000' 
-  : window.location.origin;
+const API_URL = ''; // Same origin - THIS IS THE FIX
+let currentUser = null;
 
-// ======================
-// UTILITY: TOKEN MANAGEMENT
-// ======================
+// UTILITY FUNCTIONS
+function showMessage(elementId, message, isError = true) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.textContent = message;
+  el.className = `message ${isError ? 'error' : 'success'}`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+function setLoading(buttonId, isLoading) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.disabled = isLoading;
+  btn.textContent = isLoading ? 'Processing...' : btn.dataset.originalText || 'Submit';
+  if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+}
+
+// TOKEN MANAGEMENT
 function getToken() {
   return localStorage.getItem('creativepay_token');
 }
@@ -22,178 +36,137 @@ function getAuthHeaders() {
   const token = getToken();
   return {
     'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : ''
+    ...(token && { 'Authorization': `Bearer ${token}` })
   };
 }
 
-// ======================
-// FUNCTION 1: LOGIN
-// ======================
-async function loginUser(email, password) {
+// REGISTER HANDLER - USES CORRECT IDs FROM NEW INDEX.HTML
+document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setLoading('regButton', true);
+
+  const userData = {
+    name: document.getElementById('name').value,
+    email: document.getElementById('email').value,
+    password: document.getElementById('password').value,
+    phone: document.getElementById('phone').value,
+    provider: document.getElementById('provider').value,
+    country: document.getElementById('country').value
+  };
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/login`, {
+    const response = await fetch(`${API_URL}/api/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify(userData)
     });
-    
+
     const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Registration failed');
+
+    showMessage('regMessage', 'Registration Successful! Please login.', false);
+    setTimeout(() => showLogin(), 1500);
     
+  } catch (error) {
+    showMessage('regMessage', error.message);
+  } finally {
+    setLoading('regButton', false);
+  }
+});
+
+// LOGIN HANDLER
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setLoading('loginButton', true);
+
+  try {
+    const response = await fetch(`${API_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: document.getElementById('loginEmail').value,
+        password: document.getElementById('loginPassword').value
+      })
+    });
+
+    const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Login failed');
-    
+
     setToken(data.token);
     
-    // Check KYC status immediately after login
-    if (data.user.kycStatus === 'unverified') {
-      window.location.href = '/verify-bvn'; // Redirect to BVN form
+    if (data.user && data.user.kycStatus === 0) {
+      showBVN();
     } else {
-      window.location.href = '/dashboard.html'; // Go to dashboard
+      window.location.href = '/dashboard.html';
     }
     
-    return data;
   } catch (error) {
-    console.error('Login error:', error);
-    alert(error.message);
+    showMessage('loginMessage', error.message);
+  } finally {
+    setLoading('loginButton', false);
   }
-}
+});
 
-// ======================
-// FUNCTION 2: FETCH PROFILE WITH KYC GATE
-// ======================
-async function fetchUserProfile() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/profile`, {
-      method: 'GET',
-      headers: getAuthHeaders()
-    });
-    
-    const data = await response.json();
-    
-    // KYC GATE: Catch 403 from backend
-    if (response.status === 403 && data.kycStatus === 'unverified') {
-      console.log('KYC Required. Redirecting to BVN verification...');
-      window.location.href = '/verify-bvn'; // Force BVN screen
-      return null;
-    }
-    
-    if (!response.ok) throw new Error(data.error || 'Failed to fetch profile');
-    
-    // User is verified - update dashboard
-    console.log('User verified:', data);
-    document.getElementById('user-name').innerText = data.name;
-    document.getElementById('user-balance').innerText = `₦${data.balance.toLocaleString()}`;
-    document.getElementById('kyc-badge').innerHTML = `Tier ${data.kycTier} Verified ✓`;
-    document.getElementById('kyc-badge').style.color = '#2ecc71';
-    
-    return data;
-  } catch (error) {
-    console.error('Profile fetch error:', error);
-    // If token invalid, force re-login
-    if (error.message.includes('token')) {
-      clearToken();
-      window.location.href = '/';
-    }
+// BVN HANDLER
+document.getElementById('bvnForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setLoading('bvnButton', true);
+
+  const bvn = document.getElementById('bvn').value;
+  if (bvn.length !== 11 || !/^\d+$/.test(bvn)) {
+    showMessage('bvnMessage', 'BVN must be exactly 11 digits');
+    setLoading('bvnButton', false);
+    return;
   }
-}
 
-// ======================
-// FUNCTION 3: SUBMIT BVN - TIER 1 VERIFICATION
-// ======================
-async function submitBVN(bvn) {
   try {
-    // Basic frontend validation
-    if (!bvn || bvn.length !== 11 || !/^\d+$/.test(bvn)) {
-      throw new Error('BVN must be exactly 11 digits');
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/api/kyc/verify-bvn`, {
+    const response = await fetch(`${API_URL}/api/verify-bvn`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ bvn })
     });
-    
-    const data = await response.json();
-    
-    if (!response.ok) throw new Error(data.error || 'BVN verification failed');
-    
-    alert('BVN Verified Successfully! Tier 1 Activated.');
-    window.location.href = '/dashboard.html'; // Unlock dashboard
-    
-    return data;
-  } catch (error) {
-    console.error('BVN verification error:', error);
-    alert(error.message);
-  }
-}
 
-// ======================
-// FUNCTION 4: FETCH ANALYTICS - YOUR EXISTING CODE
-// ======================
-async function updateDashboardMetrics() {
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'BVN verification failed');
+
+    showMessage('bvnMessage', 'BVN Verified Successfully! Tier 1 Activated.', false);
+    setTimeout(() => window.location.href = '/dashboard.html', 1500);
+    
+  } catch (error) {
+    showMessage('bvnMessage', error.message);
+  } finally {
+    setLoading('bvnButton', false);
+  }
+});
+
+// KYC GATE - Check on page load
+async function checkKYC() {
+  const token = getToken();
+  if (!token) return;
+
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analytics`, {
+    const response = await fetch(`${API_URL}/api/user`, {
       headers: getAuthHeaders()
     });
-    if (!response.ok) throw new Error('Network response was not ok');
-    
-    const data = await response.json();
-    if (data && data.metrics) {
-      console.log("CreativePay Live Metrics Synced:", data.metrics);
-      const metricWindow = document.getElementById('output-window');
-      if (metricWindow) {
-        metricWindow.innerText = JSON.stringify(data, null, 2);
-      }
+
+    if (response.status === 403) {
+      const data = await response.json();
+      if (data.kycRequired) window.location.href = '/?kyc=required';
     }
   } catch (error) {
-    console.error("Metrics sync fallback activated:", error);
+    console.error('KYC check failed:', error);
   }
 }
 
-// ======================
-// FUNCTION 5: UPDATE PAYOUT LEDGER - YOUR EXISTING CODE
-// ======================
-export function populatePayoutLedger(txData) {
-  if (!txData) return;
-  
-  document.getElementById('ledger-status').innerText = "SETTLED / ASSETS DISBURSED";
-  document.getElementById('ledger-status').style.color = "#2ecc71";
-  document.getElementById('ledger-gross').innerText = `$${txData.grossUSD.toFixed(2)} USD`;
-  document.getElementById('ledger-fee').innerText = `$${txData.platformFeeUSD.toFixed(2)} USD`;
-  document.getElementById('ledger-net').innerText = `$${txData.netUSD.toFixed(2)} USD`;
-  document.getElementById('ledger-payout').innerText = txData.payoutLocal;
-}
-
-// ======================
-// INITIALIZE LISTENERS
-// ======================
+// INITIALIZE
 document.addEventListener('DOMContentLoaded', () => {
-  const path = window.location.pathname;
-  
-  // If on dashboard, fetch profile + metrics
-  if (path.includes('dashboard.html')) {
-    fetchUserProfile(); // This has the KYC gate
-    updateDashboardMetrics();
-    setInterval(updateDashboardMetrics, 30000); // Auto refresh every 30s
+  // Auto-show BVN if redirected from login
+  if (window.location.search.includes('kyc=required')) {
+    showBVN();
   }
   
-  // Attach login form handler
-  const loginForm = document.getElementById('login-form');
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      loginUser(email, password);
-    });
-  }
-  
-  // Attach BVN form handler
-  const bvnForm = document.getElementById('bvn-form');
-  if (bvnForm) {
-    bvnForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const bvn = document.getElementById('bvn-input').value;
-      submitBVN(bvn);
-    });
+  // Check KYC on dashboard
+  if (window.location.pathname.includes('dashboard')) {
+    checkKYC();
   }
 });
