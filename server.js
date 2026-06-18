@@ -22,7 +22,9 @@ mongoose.connect(MONGODB_URI, {
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// User Schema
+// ======================
+// USER SCHEMA - UPGRADED FOR KYC
+// ======================
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -31,6 +33,16 @@ const userSchema = new mongoose.Schema({
   provider: { type: String },
   country: { type: String, default: 'Nigeria' },
   balance: { type: Number, default: 0 },
+  
+  // KYC Fields - Tier System
+  kycStatus: { 
+    type: String, 
+    enum: ['unverified', 'pending', 'verified', 'rejected'],
+    default: 'unverified' 
+  },
+  kycTier: { type: Number, default: 0 }, // 0=none, 1=BVN, 2=ID, 3=Business
+  bvn: { type: String, select: false }, // Hidden from API responses
+  
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -43,11 +55,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'creativepay-secret-key-2026';
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
+  
   if (!token) {
     return res.status(401).json({ error: 'Access denied. No token provided.' });
   }
-
+  
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
@@ -57,7 +69,9 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Routes
+// ======================
+// ROUTES
+// ======================
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -72,27 +86,27 @@ app.get('/api/health', (req, res) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { name, email, password, phone, provider, country } = req.body;
-
+    
     // Validation
     if (!name ||!email ||!password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
-
+    
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
-
+    
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'Email already registered' });
     }
-
+    
     // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
+    
+    // Create user - kycStatus defaults to 'unverified'
     const user = new User({
       name,
       email,
@@ -101,53 +115,53 @@ app.post('/api/register', async (req, res) => {
       provider,
       country
     });
-
+    
     await user.save();
-
+    
     res.status(201).json({
       message: 'Account created successfully',
       userId: user._id
     });
-
+    
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ error: 'Server error during registration' });
   }
 });
 
-// Login - UPDATED TO INCLUDE NAME IN TOKEN
+// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
+    
     // Validation
     if (!email ||!password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
-
+    
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
-
+    
     // Check password
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
-
-    // Create token with NAME included
+    
+    // Generate JWT - Now includes name for dashboard
     const token = jwt.sign(
       {
         id: user._id,
         email: user.email,
-        name: user.name // Now includes name for dashboard
+        name: user.name
       },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
-
+    
     res.json({
       message: 'Login successful',
       token,
@@ -155,23 +169,73 @@ app.post('/api/login', async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        balance: user.balance
+        balance: user.balance,
+        kycStatus: user.kycStatus, // Send KYC status to frontend
+        kycTier: user.kycTier
       }
     });
-
+    
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Server error during login' });
   }
 });
 
-// Get User Profile - Protected Route
+// ======================
+// NEW: KYC VERIFICATION - TIER 1
+// ======================
+app.post('/api/kyc/verify-bvn', authenticateToken, async (req, res) => {
+  try {
+    const { bvn } = req.body;
+    
+    // Basic validation
+    if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
+      return res.status(400).json({ error: 'BVN must be 11 digits' });
+    }
+    
+    // TODO PRODUCTION: Integrate Paystack/Flutterwave BVN Verification API here
+    // For MVP: Accept any 11 digits as valid
+    
+    const user = await User.findByIdAndUpdate(
+      req.user.id, 
+      { 
+        bvn: bvn,
+        kycStatus: 'verified',
+        kycTier: 1 
+      },
+      { new: true }
+    ).select('-password -bvn'); // Don't send bvn back
+    
+    res.json({ 
+      message: 'BVN verified successfully. Tier 1 activated.',
+      kycStatus: user.kycStatus,
+      kycTier: user.kycTier
+    });
+    
+  } catch (error) {
+    console.error('BVN verification error:', error);
+    res.status(500).json({ error: 'Server error during BVN verification' });
+  }
+});
+
+// Get User Profile - Protected Route WITH KYC GATE
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id).select('-password -bvn');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // KYC GATE: This is the professional VC-level check
+    if (user.kycStatus === 'unverified') {
+      return res.status(403).json({ 
+        error: 'KYC required',
+        kycStatus: 'unverified',
+        message: 'Please complete BVN verification to access your dashboard',
+        nextStep: '/verify-bvn'
+      });
+    }
+    
     res.json(user);
   } catch (error) {
     console.error('Profile error:', error);
