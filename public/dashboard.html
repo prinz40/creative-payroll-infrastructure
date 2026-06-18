@@ -3,111 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay Dashboard</title>
+  <title>CreativePay - Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      padding: 20px;
+      background: #0f172a; color: #e2e8f0; padding: 20px;
     }
-   .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
+    .container { max-width: 800px; margin: 0 auto; }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155;
     }
-   .title {
-      color: #38bdf8;
-      font-size: 24px;
-      font-weight: 700;
+    h1 { color: #38bdf8; font-size: 24px; }
+    .card {
+      background: #1e293b; padding: 24px; border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
     }
-   .logout {
-      background: #ef4444;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
+    .balance-card { text-align: center; }
+    .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
+    .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
+    .kyc-badge {
+      display: inline-block; padding: 6px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; margin-top: 12px;
+      background: #334155; color: #94a3b8;
     }
-   .card {
-      background: #1e293b;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 16px;
+    .kyc-verified { background: #166534; color: #4ade80; }
+    .user-info { display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .label { color: #94a3b8; font-size: 14px; }
+    .value { font-weight: 600; }
+    .logout-btn {
+      background: #dc2626; color: white; border: none;
+      padding: 8px 16px; border-radius: 6px; cursor: pointer;
     }
-   .label {
-      font-size: 12px;
-      color: #94a3b8;
-      margin-bottom: 4px;
+    #output-window {
+      background: #0f172a; padding: 16px; border-radius: 8px;
+      font-family: monospace; font-size: 12px; overflow-x: auto;
+      margin-top: 20px; border: 1px solid #334155;
     }
-   .value {
-      font-size: 20px;
-      font-weight: 600;
-    }
-   .balance {
-      font-size: 32px;
-      color: #10b981;
-      font-weight: 700;
-    }
+    .loading { text-align: center; padding: 40px; color: #94a3b8; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="title">CreativePay Dashboard</div>
-    <button class="logout" onclick="logout()">Logout</button>
+  <div class="container">
+    <div class="header">
+      <h1>CreativePay Dashboard</h1>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div id="loadingState" class="loading">Loading your account...</div>
+
+    <div id="dashboardContent" style="display: none;">
+      <!-- User Info Card -->
+      <div class="card">
+        <div class="user-info">
+          <span class="label">Welcome back,</span>
+          <span class="value" id="user-name">Loading...</span>
+        </div>
+        <div class="user-info">
+          <span class="label">KYC Status</span>
+          <span class="kyc-badge" id="kyc-badge">Checking...</span>
+        </div>
+      </div>
+
+      <!-- Balance Card -->
+      <div class="card balance-card">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-amount" id="user-balance">₦0</div>
+      </div>
+
+      <!-- Analytics Card -->
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">Live Metrics</h3>
+        <pre id="output-window">Connecting to CreativePay servers...</pre>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="label">Welcome back,</div>
-    <div class="value" id="userName">Loading...</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Account Balance</div>
-    <div class="balance" id="userBalance">₦0.00</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Email</div>
-    <div class="value" id="userEmail">Loading...</div>
-  </div>
-
+  <!-- CRITICAL: Load app.js - This runs fetchUserProfile() + KYC gate -->
+  <script src="/app.js"></script>
+  
   <script>
-    // Decode JWT to get user info
-    function parseJwt(token) {
-      try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload);
-      } catch (e) {
-        return null;
-      }
-    }
-
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = '/';
-    } else {
-      const userData = parseJwt(token);
-      if (userData) {
-        document.getElementById('userName').textContent = userData.name || 'User';
-        document.getElementById('userEmail').textContent = userData.email || 'No email';
-      } else {
-        logout();
-      }
-    }
-
     function logout() {
-      localStorage.removeItem('token');
+      localStorage.removeItem('creativepay_token');
       window.location.href = '/';
     }
+
+    // app.js will call fetchUserProfile() and hide loading when done
+    document.addEventListener('DOMContentLoaded', () => {
+      // Give app.js 1 second to run fetchUserProfile()
+      setTimeout(() => {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('dashboardContent').style.display = 'block';
+      }, 1000);
+    });
   </script>
 </body>
 </html>
