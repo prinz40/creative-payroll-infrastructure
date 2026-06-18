@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay Dashboard</title>
+  <title>CreativePay - Login</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { 
@@ -104,6 +104,11 @@
   </div>
 
   <script>
+    // Check if already logged in
+    if (localStorage.getItem('token')) {
+      window.location.href = '/dashboard.html';
+    }
+
     // Toggle forms
     function showLogin() {
       document.getElementById('registerCard').classList.add('hidden');
@@ -114,7 +119,7 @@
       document.getElementById('registerCard').classList.remove('hidden');
     }
 
-    // REGISTER HANDLER - THIS IS THE FIX
+    // REGISTER HANDLER
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const button = document.getElementById('regButton');
@@ -158,7 +163,7 @@
       }
     });
 
-    // LOGIN HANDLER
+    // LOGIN HANDLER - REDIRECT IS ENABLED
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const button = document.getElementById('loginButton');
@@ -189,8 +194,10 @@
         localStorage.setItem('token', result.token);
         message.innerHTML = '<div class="success">Login successful! Redirecting...</div>';
         
-        // Redirect to dashboard here
-        // window.location.href = '/dashboard.html';
+        // THIS LINE IS NOW ACTIVE - REDIRECTS TO DASHBOARD
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 1000);
         
       } catch (error) {
         message.innerHTML = `<div class="error">${error.message}</div>`;
