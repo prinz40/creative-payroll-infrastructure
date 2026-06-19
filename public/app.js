@@ -1,172 +1,114 @@
-const API_URL = ''; // Same origin - THIS IS THE FIX
-let currentUser = null;
+// ===================
+// CONFIG
+// ===================
+const API_URL = 'https://creative-payroll-infrastructure.onrender.com';
 
-// UTILITY FUNCTIONS
-function showMessage(elementId, message, isError = true) {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-  el.textContent = message;
-  el.className = `message ${isError ? 'error' : 'success'}`;
-  el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 5000);
-}
+// ===================
+// KYC BVN VERIFICATION - UPDATED URL
+// ===================
+async function verifyBVN() {
+  const bvnInput = document.getElementById('bvnInput');
+  const bvnError = document.getElementById('bvnError');
+  const bvnSuccess = document.getElementById('bvnSuccess');
+  const verifyBtn = document.getElementById('verifyBvnBtn');
 
-function setLoading(buttonId, isLoading) {
-  const btn = document.getElementById(buttonId);
-  if (!btn) return;
-  btn.disabled = isLoading;
-  btn.textContent = isLoading ? 'Processing...' : btn.dataset.originalText || 'Submit';
-  if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
-}
+  const bvn = bvnInput.value.trim();
+  const token = localStorage.getItem('token');
 
-// TOKEN MANAGEMENT
-function getToken() {
-  return localStorage.getItem('creativepay_token');
-}
+  // Reset messages
+  bvnError.style.display = 'none';
+  bvnSuccess.style.display = 'none';
 
-function setToken(token) {
-  localStorage.setItem('creativepay_token', token);
-}
+  // Validation
+  if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
+    bvnError.textContent = 'BVN must be exactly 11 digits';
+    bvnError.style.display = 'block';
+    return;
+  }
 
-function clearToken() {
-  localStorage.removeItem('creativepay_token');
-}
+  if (!token) {
+    bvnError.textContent = 'Session expired. Please login again.';
+    bvnError.style.display = 'block';
+    return;
+  }
 
-function getAuthHeaders() {
-  const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-}
-
-// REGISTER HANDLER - USES CORRECT IDs FROM NEW INDEX.HTML
-document.getElementById('registerForm')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setLoading('regButton', true);
-
-  const userData = {
-    name: document.getElementById('name').value,
-    email: document.getElementById('email').value,
-    password: document.getElementById('password').value,
-    phone: document.getElementById('phone').value,
-    provider: document.getElementById('provider').value,
-    country: document.getElementById('country').value
-  };
+  // Show loading
+  verifyBtn.textContent = 'Processing...';
+  verifyBtn.disabled = true;
 
   try {
-    const response = await fetch(`${API_URL}/api/register`, {
+    const response = await fetch(`${API_URL}/api/kyc/verify-bvn`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ bvn })
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Registration failed');
 
-    showMessage('regMessage', 'Registration Successful! Please login.', false);
-    setTimeout(() => showLogin(), 1500);
-    
+    if (response.ok) {
+      bvnSuccess.textContent = data.message;
+      bvnSuccess.style.display = 'block';
+
+      // Update localStorage
+      const user = JSON.parse(localStorage.getItem('user'));
+      user.kycStatus = data.kycStatus;
+      user.kycTier = data.kycTier;
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // Redirect to dashboard after 2 seconds
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+
+    } else {
+      bvnError.textContent = data.error || 'Verification failed';
+      bvnError.style.display = 'block';
+    }
+
   } catch (error) {
-    showMessage('regMessage', error.message);
+    console.error('BVN error:', error);
+    bvnError.textContent = 'Network error. Please try again.';
+    bvnError.style.display = 'block';
   } finally {
-    setLoading('regButton', false);
+    verifyBtn.textContent = 'Verify BVN';
+    verifyBtn.disabled = false;
   }
-});
+}
 
-// LOGIN HANDLER
-document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setLoading('loginButton', true);
+// ===================
+// LOGIN FUNCTION - FOR CONTEXT
+// ===================
+async function login() {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const errorMsg = document.getElementById('errorMsg');
 
   try {
     const response = await fetch(`${API_URL}/api/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: document.getElementById('loginEmail').value,
-        password: document.getElementById('loginPassword').value
-      })
+      body: JSON.stringify({ email, password })
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Login failed');
 
-    setToken(data.token);
-    
-    if (data.user && data.user.kycStatus === 0) {
-      showBVN();
+    if (response.ok) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Check KYC status
+      if (data.user.kycStatus === 'unverified' || data.user.kycTier === 0) {
+        window.location.href = '/?kyc=required';
+      } else {
+        window.location.href = '/';
+      }
     } else {
-      window.location.href = '/dashboard.html';
-    }
-    
-  } catch (error) {
-    showMessage('loginMessage', error.message);
-  } finally {
-    setLoading('loginButton', false);
-  }
-});
-
-// BVN HANDLER
-document.getElementById('bvnForm')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  setLoading('bvnButton', true);
-
-  const bvn = document.getElementById('bvn').value;
-  if (bvn.length !== 11 || !/^\d+$/.test(bvn)) {
-    showMessage('bvnMessage', 'BVN must be exactly 11 digits');
-    setLoading('bvnButton', false);
-    return;
-  }
-
-  try {
-    const response = await fetch(`${API_URL}/api/verify-bvn`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ bvn })
-    });
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'BVN verification failed');
-
-    showMessage('bvnMessage', 'BVN Verified Successfully! Tier 1 Activated.', false);
-    setTimeout(() => window.location.href = '/dashboard.html', 1500);
-    
-  } catch (error) {
-    showMessage('bvnMessage', error.message);
-  } finally {
-    setLoading('bvnButton', false);
-  }
-});
-
-// KYC GATE - Check on page load
-async function checkKYC() {
-  const token = getToken();
-  if (!token) return;
-
-  try {
-    const response = await fetch(`${API_URL}/api/user`, {
-      headers: getAuthHeaders()
-    });
-
-    if (response.status === 403) {
-      const data = await response.json();
-      if (data.kycRequired) window.location.href = '/?kyc=required';
+      errorMsg.textContent = data.error;
     }
   } catch (error) {
-    console.error('KYC check failed:', error);
+    errorMsg.textContent = 'Network error. Please try again.';
   }
 }
-
-// INITIALIZE
-document.addEventListener('DOMContentLoaded', () => {
-  // Auto-show BVN if redirected from login
-  if (window.location.search.includes('kyc=required')) {
-    showBVN();
-  }
-  
-  // Check KYC on dashboard
-  if (window.location.pathname.includes('dashboard')) {
-    checkKYC();
-  }
-});
