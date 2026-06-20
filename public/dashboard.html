@@ -23,12 +23,14 @@
     .balance-card { text-align: center; }
     .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
     .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
+    .wallet-id { font-size: 12px; color: #64748b; margin-top: 8px; font-family: monospace; }
     .kyc-badge {
       display: inline-block; padding: 6px 12px; border-radius: 20px;
       font-size: 12px; font-weight: 600; margin-top: 12px;
       background: #334155; color: #94a3b8;
     }
     .kyc-verified { background: #166534; color: #4ade80; }
+    .kyc-pending { background: #854d0e; color: #facc15; }
     .user-info { display: flex; justify-content: space-between; margin-bottom: 12px; }
     .label { color: #94a3b8; font-size: 14px; }
     .value { font-weight: 600; }
@@ -36,12 +38,18 @@
       background: #dc2626; color: white; border: none;
       padding: 8px 16px; border-radius: 6px; cursor: pointer;
     }
+    .logout-btn:hover { background: #b91c1c; }
     #output-window {
       background: #0f172a; padding: 16px; border-radius: 8px;
       font-family: monospace; font-size: 12px; overflow-x: auto;
       margin-top: 20px; border: 1px solid #334155;
     }
     .loading { text-align: center; padding: 40px; color: #94a3b8; }
+    .kyc-banner {
+      background: #166534; color: #4ade80; padding: 12px;
+      border-radius: 8px; text-align: center; font-weight: 600;
+      margin-bottom: 20px; display: none;
+    }
   </style>
 </head>
 <body>
@@ -54,10 +62,19 @@
     <div id="loadingState" class="loading">Loading your account...</div>
 
     <div id="dashboardContent" style="display: none;">
+      <!-- KYC Tier 1 Banner -->
+      <div class="kyc-banner" id="kyc-banner">
+        ✅ KYC TIER 1 VERIFIED - Welcome to CreativePay!
+      </div>
+
       <!-- User Info Card -->
       <div class="card">
         <div class="user-info">
-          <span class="label">Welcome back,</span>
+          <span class="label">Account Email</span>
+          <span class="value" id="user-email">Loading...</span>
+        </div>
+        <div class="user-info">
+          <span class="label">Full Name</span>
           <span class="value" id="user-name">Loading...</span>
         </div>
         <div class="user-info">
@@ -66,10 +83,26 @@
         </div>
       </div>
 
-      <!-- Balance Card -->
+      <!-- Wallet Balance Card -->
       <div class="card balance-card">
         <div class="balance-label">Available Balance</div>
-        <div class="balance-amount" id="user-balance">₦0</div>
+        <div class="balance-amount" id="user-balance">₦0.00</div>
+        <div class="wallet-id" id="wallet-id">Wallet ID: Generating...</div>
+      </div>
+
+      <!-- Quick Actions Card -->
+      <div class="card">
+        <h3 style="margin-bottom: 16px;">Quick Actions</h3>
+        <div style="display: grid; gap: 12px;">
+          <button onclick="alert('Fund Wallet coming in Phase 3')" 
+                  style="padding: 12px; background: #2563eb; border: none; border-radius: 6px; color: white; cursor: pointer;">
+            Fund Wallet
+          </button>
+          <button onclick="alert('Send Money coming in Phase 3')" 
+                  style="padding: 12px; background: #16a34a; border: none; border-radius: 6px; color: white; cursor: pointer;">
+            Send Money
+          </button>
+        </div>
       </div>
 
       <!-- Analytics Card -->
@@ -82,20 +115,57 @@
 
   <!-- CRITICAL: Load app.js - This runs fetchUserProfile() + KYC gate -->
   <script src="/app.js"></script>
-  
+
   <script>
     function logout() {
       localStorage.removeItem('creativepay_token');
       window.location.href = '/';
     }
 
-    // app.js will call fetchUserProfile() and hide loading when done
+    // Update dashboard with user + wallet data
+    function updateDashboard(userData) {
+      document.getElementById('user-email').textContent = userData.email || 'N/A';
+      document.getElementById('user-name').textContent = userData.fullName || 'CreativePay User';
+      
+      // KYC Badge
+      const kycBadge = document.getElementById('kyc-badge');
+      if (userData.kycTier === 1) {
+        kycBadge.textContent = 'KYC TIER 1 VERIFIED';
+        kycBadge.className = 'kyc-badge kyc-verified';
+        document.getElementById('kyc-banner').style.display = 'block';
+      } else {
+        kycBadge.textContent = 'UNVERIFIED';
+        kycBadge.className = 'kyc-badge';
+      }
+
+      // Wallet Data
+      if (userData.wallet) {
+        document.getElementById('user-balance').textContent = `₦${userData.wallet.balance.toFixed(2)}`;
+        document.getElementById('wallet-id').textContent = `Wallet ID: ${userData.wallet.walletId}`;
+      } else {
+        document.getElementById('user-balance').textContent = '₦0.00';
+        document.getElementById('wallet-id').textContent = 'Wallet ID: Pending KYC';
+      }
+    }
+
+    // app.js will call fetchUserProfile() - we hook into it
     document.addEventListener('DOMContentLoaded', () => {
-      // Give app.js 1 second to run fetchUserProfile()
+      // Wait for app.js to fetch and populate window.currentUser
+      const checkUser = setInterval(() => {
+        if (window.currentUser) {
+          clearInterval(checkUser);
+          updateDashboard(window.currentUser);
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('dashboardContent').style.display = 'block';
+        }
+      }, 100);
+
+      // Fallback: show dashboard after 3s even if app.js fails
       setTimeout(() => {
+        clearInterval(checkUser);
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
-      }, 1000);
+      }, 3000);
     });
   </script>
 </body>
