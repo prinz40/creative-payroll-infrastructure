@@ -270,14 +270,23 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // =========================
-// 7. CATCH-ALL FOR SPA - MUST BE LAST
+// 7. SPECIFIC ROUTES - MUST BE BEFORE CATCH-ALL
+// =========================
+
+// Serve wallet dashboard at /dashboard
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// =========================
+// 8. CATCH-ALL FOR SPA - MUST BE LAST
 // =========================
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // =========================
-// 8. START SERVER
+// 9. START SERVER
 // =========================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
