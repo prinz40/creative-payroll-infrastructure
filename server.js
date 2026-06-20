@@ -19,8 +19,8 @@ app.use(express.urlencoded({ extended: true }));
 // 2. DATABASE CONNECTION
 // =========================
 mongoose.connect(process.env.MONGODB_URI)
- .then(() => console.log('✅ MongoDB Connected - Creativepay Cluster'))
- .catch(err => console.error('❌ MongoDB Error:', err));
+.then(() => console.log('✅ MongoDB Connected - Creativepay Cluster'))
+.catch(err => console.error('❌ MongoDB Error:', err));
 
 // =========================
 // 3. DATABASE MODELS
@@ -58,6 +58,9 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
+// PHASE 2: WALLET MODEL
+const Wallet = require('./models/Wallet');
+
 // =========================
 // 4. AUTH MIDDLEWARE - FOR PROTECTED ROUTES
 // =========================
@@ -85,7 +88,6 @@ app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
 
-    // Validation
     if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
@@ -94,16 +96,13 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
 
-    // Check if user exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create and save user
     const user = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
@@ -114,7 +113,6 @@ app.post('/api/register', async (req, res) => {
 
     await user.save();
 
-    // Create JWT token
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
@@ -129,7 +127,8 @@ app.post('/api/register', async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         kycTier: user.kycTier,
-        kycStatus: user.kycStatus
+        kycStatus: user.kycStatus,
+        wallet: null
       },
       token: token
     });
@@ -144,29 +143,27 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validation
     if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
 
-    // Find user
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    // Create token
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    const wallet = await Wallet.findOne({ userId: user._id });
 
     console.log('✅ User logged in:', user.email);
     res.json({
@@ -176,7 +173,8 @@ app.post('/api/login', async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         kycTier: user.kycTier,
-        kycStatus: user.kycStatus
+        kycStatus: user.kycStatus,
+        wallet: wallet || null
       },
       token: token
     });
@@ -186,20 +184,18 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// BVN VERIFICATION - PROTECTED ROUTE
+// BVN VERIFICATION - PROTECTED ROUTE + WALLET CREATION
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
-    const userEmail = req.user.email;
+    const userId = req.user.id;
 
-    // Validate BVN is 11 digits
     if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
 
-    // Find user and update
-    const user = await User.findOneAndUpdate(
-      { email: userEmail },
+    const user = await User.findByIdAndUpdate(
+      userId,
       {
         bvn: bvn,
         kycTier: 1,
@@ -212,6 +208,18 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    // PHASE 2: AUTO-CREATE WALLET ON KYC TIER 1
+    let wallet = await Wallet.findOne({ userId: user._id });
+    if (!wallet) {
+      wallet = await Wallet.create({
+        userId: user._id,
+        walletId: `CPY-${Date.now()}-${user._id.toString().slice(-4)}`,
+        balance: 0,
+        currency: 'NGN'
+      });
+      console.log(`✅ Wallet created for: ${user.email}`);
+    }
+
     console.log('✅ BVN Verified for:', user.email);
     res.json({
       success: true,
@@ -220,7 +228,8 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
         email: user.email,
         fullName: user.fullName,
         kycTier: user.kycTier,
-        kycStatus: user.kycStatus
+        kycStatus: user.kycStatus,
+        wallet: wallet
       }
     });
   } catch (error) {
@@ -229,15 +238,28 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   }
 });
 
-// GET CURRENT USER - PROTECTED ROUTE
+// GET CURRENT USER - PROTECTED ROUTE + WALLET
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, user });
+
+    const wallet = await Wallet.findOne({ userId: user._id });
+
+    res.json({
+      success: true,
+      user: {
+        email: user.email,
+        fullName: user.fullName,
+        kycTier: user.kycTier,
+        kycStatus: user.kycStatus,
+        wallet: wallet || null
+      }
+    });
   } catch (error) {
+    console.error('❌ User Fetch Error:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch user' });
   }
 });
