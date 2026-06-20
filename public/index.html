@@ -111,7 +111,7 @@
       </div>
     </div>
 
-    <!-- BVN VERIFICATION FORM - HIDDEN BY DEFAULT -->
+    <!-- BVN VERIFICATION FORM -->
     <div id="bvnCard" class="card" style="display: none;">
       <div class="kyc-warning">
         <strong>KYC TIER 1 REQUIRED</strong><br>
@@ -132,16 +132,18 @@
     </div>
   </div>
 
-  <!-- CRITICAL: Load app.js - This handles ALL logic -->
-  <script src="/app.js"></script>
-  
   <script>
+    // === CONFIG ===
+    const API_URL = '/api';  // Works on Render automatically
+    const TOKEN_KEY = 'creativepay_token';
+
+    // === UI HELPERS ===
     function showRegister() {
       document.getElementById('loginCard').style.display = 'none';
       document.getElementById('registerCard').style.display = 'block';
       document.getElementById('bvnCard').style.display = 'none';
     }
-    
+
     function showLogin() {
       document.getElementById('registerCard').style.display = 'none';
       document.getElementById('loginCard').style.display = 'block';
@@ -154,18 +156,163 @@
       document.getElementById('bvnCard').style.display = 'block';
     }
 
+    function showMessage(id, text, type) {
+      const el = document.getElementById(id);
+      el.textContent = text;
+      el.className = `message ${type}`;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
     function logout() {
-      localStorage.removeItem('creativepay_token');
+      localStorage.removeItem(TOKEN_KEY);
       window.location.href = '/';
     }
 
-    // Check URL for kyc=required on page load
-    document.addEventListener('DOMContentLoaded', () => {
+    // === CHECK IF ALREADY LOGGED IN ===
+    function checkAuth() {
+      const token = localStorage.getItem(TOKEN_KEY);
       const urlParams = new URLSearchParams(window.location.search);
+      
       if (urlParams.get('kyc') === 'required') {
         showBVN();
+      } else if (token) {
+        // Already logged in, go to dashboard
+        window.location.href = '/dashboard.html'; 
+      }
+    }
+
+    // === LOGIN ===
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('loginButton');
+      btn.disabled = true;
+      btn.textContent = 'Logging in...';
+
+      try {
+        const res = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('loginEmail').value,
+            password: document.getElementById('loginPassword').value
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || 'Login failed');
+        }
+
+        // THIS IS THE LINE THAT FIXES YOUR LOOP
+        localStorage.setItem(TOKEN_KEY, data.token);
+        
+        showMessage('loginMessage', 'Login successful!', 'success');
+        
+        // Check if KYC needed
+        setTimeout(() => {
+          if (data.user && data.user.kycTier === 0) {
+            showBVN();
+          } else {
+            window.location.href = '/dashboard.html';
+          }
+        }, 1000);
+
+      } catch (err) {
+        showMessage('loginMessage', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Login';
       }
     });
+
+    // === REGISTER ===
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('regButton');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      try {
+        const res = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            phone: document.getElementById('phone').value,
+            provider: document.getElementById('provider').value,
+            country: document.getElementById('country').value
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || 'Registration failed');
+        }
+
+        localStorage.setItem(TOKEN_KEY, data.token);
+        showMessage('regMessage', 'Account created! Please verify BVN.', 'success');
+        
+        setTimeout(() => showBVN(), 1500);
+
+      } catch (err) {
+        showMessage('regMessage', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    });
+
+    // === BVN VERIFY ===
+    document.getElementById('bvnForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('bvnButton');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      try {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) {
+          logout();
+          return;
+        }
+
+        const res = await fetch(`${API_URL}/kyc/verify-bvn`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            bvn: document.getElementById('bvn').value
+          })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || 'BVN verification failed');
+        }
+
+        showMessage('bvnMessage', 'BVN verified! Redirecting...', 'success');
+        setTimeout(() => {
+          window.location.href = '/dashboard.html';
+        }, 1500);
+
+      } catch (err) {
+        showMessage('bvnMessage', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify BVN';
+      }
+    });
+
+    // === INIT ===
+    document.addEventListener('DOMContentLoaded', checkAuth);
   </script>
 </body>
 </html>
