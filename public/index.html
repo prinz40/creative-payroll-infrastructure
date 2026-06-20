@@ -3,316 +3,367 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay - Login</title>
+  <title>CreativePay</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
+    body { 
+      background: #0d1117; 
+      color: #c9d1d9; 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a; color: #e2e8f0; min-height: 100vh;
-      display: flex; align-items: center; justify-content: center; padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
     }
-    .container { width: 100%; max-width: 420px; }
-    .logo { text-align: center; margin-bottom: 30px; }
-    .logo h1 { color: #38bdf8; font-size: 32px; font-weight: 700; }
-    .card {
-      background: #1e293b; padding: 32px; border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155;
+    .container {
+      background: #161b22;
+      padding: 30px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid #30363d;
     }
-    .form-group { margin-bottom: 18px; }
-    label { display: block; margin-bottom: 6px; font-size: 14px; color: #cbd5e1; }
-    input, select {
-      width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155;
-      border-radius: 8px; color: #e2e8f0; font-size: 15px;
-    }
-    input:focus, select:focus { outline: none; border-color: #38bdf8; }
-    button {
-      width: 100%; padding: 14px; background: #0ea5e9; border: none;
-      border-radius: 8px; color: white; font-size: 16px; font-weight: 600;
-      cursor: pointer; margin-top: 8px;
-    }
-    button:disabled { background: #475569; cursor: not-allowed; }
-    .toggle { text-align: center; margin-top: 20px; font-size: 14px; color: #94a3b8; }
-    .toggle a { color: #38bdf8; cursor: pointer; text-decoration: none; }
-    .message {
-      padding: 12px; border-radius: 8px; margin-top: 16px; font-size: 14px;
-      text-align: center; display: none;
-    }
-    .error { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
-    .success { background: #14532d; color: #bbf7d0; border: 1px solid #16a34a; }
+    h1 { color: #58a6ff; text-align: center; margin-bottom: 20px; }
+    h2 { text-align: center; margin-bottom: 20px; }
     .kyc-warning {
-      background: #713f12; color: #fef08a; border: 1px solid #eab308;
-      padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 14px;
+      background: #9e6a03;
+      color: #fff;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
     }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      font-size: 16px;
+    }
+    input:focus { outline: none; border-color: #58a6ff; }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #238636;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #484f58; cursor: not-allowed; }
+    .link {
+      text-align: center;
+      margin-top: 15px;
+      color: #58a6ff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .error {
+      background: #da3633;
+      color: white;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px 0;
+      text-align: center;
+      font-size: 14px;
+    }
+    .success {
+      background: #238636;
+      color: white;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px 0;
+      text-align: center;
+      font-size: 14px;
+    }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo"><h1>CreativePay</h1></div>
-
+    <h1>CreativePay</h1>
+    
     <!-- LOGIN FORM -->
-    <div id="loginCard" class="card">
-      <h2 style="margin-bottom: 20px; text-align: center;">Welcome Back</h2>
-      <form id="loginForm">
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="loginEmail" required>
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="loginPassword" required>
-        </div>
-        <button type="submit" id="loginButton">Login</button>
-        <div id="loginMessage" class="message"></div>
-      </form>
-      <div class="toggle">
-        Don't have an account? <a onclick="showRegister()">Create Account</a>
-      </div>
+    <div id="loginForm">
+      <h2>Login</h2>
+      <div id="loginError" class="error hidden"></div>
+      <input type="email" id="loginEmail" placeholder="Email" />
+      <input type="password" id="loginPassword" placeholder="Password" />
+      <button onclick="handleLogin()">Login</button>
+      <div class="link" onclick="showRegister()">Don't have an account? Register</div>
     </div>
 
     <!-- REGISTER FORM -->
-    <div id="registerCard" class="card" style="display: none;">
-      <h2 style="margin-bottom: 20px; text-align: center;">Create Account</h2>
-      <form id="registerForm">
-        <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" id="name" required>
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="email" required>
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="password" required minlength="6">
-        </div>
-        <div class="form-group">
-          <label>Phone</label>
-          <input type="tel" id="phone">
-        </div>
-        <div class="form-group">
-          <label>Provider</label>
-          <select id="provider">
-            <option value="">Select Provider</option>
-            <option value="MTN">MTN</option>
-            <option value="Airtel">Airtel</option>
-            <option value="Glo">Glo</option>
-            <option value="9mobile">9mobile</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Country</label>
-          <input type="text" id="country" value="Nigeria">
-        </div>
-        <button type="submit" id="regButton">Create Account</button>
-        <div id="regMessage" class="message"></div>
-      </form>
-      <div class="toggle">
-        Already have an account? <a onclick="showLogin()">Login</a>
-      </div>
+    <div id="registerForm" class="hidden">
+      <h2>Register</h2>
+      <div id="registerError" class="error hidden"></div>
+      <input type="text" id="registerName" placeholder="Full Name" />
+      <input type="email" id="registerEmail" placeholder="Email" />
+      <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" />
+      <button onclick="handleRegister()">Register</button>
+      <div class="link" onclick="showLogin()">Already have an account? Login</div>
     </div>
 
-    <!-- BVN VERIFICATION FORM -->
-    <div id="bvnCard" class="card" style="display: none;">
+    <!-- BVN VERIFICATION -->
+    <div id="bvnForm" class="hidden">
       <div class="kyc-warning">
         <strong>KYC TIER 1 REQUIRED</strong><br>
         Verify your BVN to unlock your CreativePay dashboard and enable transactions.
       </div>
-      <h2 style="margin-bottom: 20px; text-align: center;">BVN Verification</h2>
-      <form id="bvnForm">
-        <div class="form-group">
-          <label>Bank Verification Number (BVN)</label>
-          <input type="text" id="bvn" required maxlength="11" pattern="[0-9]{11}" placeholder="Enter 11-digit BVN">
-        </div>
-        <button type="submit" id="bvnButton">Verify BVN</button>
-        <div id="bvnMessage" class="message"></div>
-      </form>
-      <div class="toggle">
-        <a onclick="logout()">Logout</a>
-      </div>
+      <h2>BVN Verification</h2>
+      <div id="bvnError" class="error hidden"></div>
+      <div id="bvnSuccess" class="success hidden"></div>
+      <label>Bank Verification Number (BVN)</label>
+      <input type="text" id="bvnInput" placeholder="Enter 11-digit BVN" maxlength="11" />
+      <button onclick="handleBVN()">Verify BVN</button>
+      <div class="link" onclick="handleLogout()">Logout</div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="hidden">
+      <h2>Dashboard</h2>
+      <div class="success">KYC Tier 1 Verified ✅</div>
+      <p style="margin: 20px 0; text-align: center;">Welcome to CreativePay!</p>
+      <p style="margin: 10px 0; text-align: center;" id="userEmail"></p>
+      <div class="link" onclick="handleLogout()">Logout</div>
     </div>
   </div>
 
   <script>
-    // === CONFIG ===
-    const API_URL = '/api';  // Works on Render automatically
-    const TOKEN_KEY = 'creativepay_token';
-
-    // === UI HELPERS ===
-    function showRegister() {
-      document.getElementById('loginCard').style.display = 'none';
-      document.getElementById('registerCard').style.display = 'block';
-      document.getElementById('bvnCard').style.display = 'none';
+    // =========================
+    // 1. GLOBAL STATE & HELPERS
+    // =========================
+    const API_URL = ''; // Same domain, no CORS needed
+    
+    function getToken() {
+      return localStorage.getItem('token');
+    }
+    
+    function setToken(token) {
+      localStorage.setItem('token', token);
+    }
+    
+    function clearToken() {
+      localStorage.removeItem('token');
+    }
+    
+    function showError(elementId, message) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.classList.remove('hidden');
+    }
+    
+    function hideError(elementId) {
+      document.getElementById(elementId).classList.add('hidden');
+    }
+    
+    function showSuccess(elementId, message) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.classList.remove('hidden');
     }
 
+    // =========================
+    // 2. PAGE NAVIGATION
+    // =========================
     function showLogin() {
-      document.getElementById('registerCard').style.display = 'none';
-      document.getElementById('loginCard').style.display = 'block';
-      document.getElementById('bvnCard').style.display = 'none';
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('bvnForm').classList.add('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
     }
-
+    
+    function showRegister() {
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.remove('hidden');
+      document.getElementById('bvnForm').classList.add('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+    }
+    
     function showBVN() {
-      document.getElementById('loginCard').style.display = 'none';
-      document.getElementById('registerCard').style.display = 'none';
-      document.getElementById('bvnCard').style.display = 'block';
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('bvnForm').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+    }
+    
+    function showDashboard(user) {
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('bvnForm').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('userEmail').textContent = user.email;
     }
 
-    function showMessage(id, text, type) {
-      const el = document.getElementById(id);
-      el.textContent = text;
-      el.className = `message ${type}`;
-      el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; }, 5000);
-    }
-
-    function logout() {
-      localStorage.removeItem(TOKEN_KEY);
-      window.location.href = '/';
-    }
-
-    // === CHECK IF ALREADY LOGGED IN ===
-    function checkAuth() {
-      const token = localStorage.getItem(TOKEN_KEY);
-      const urlParams = new URLSearchParams(window.location.search);
+    // =========================
+    // 3. AUTH FUNCTIONS
+    // =========================
+    async function handleRegister() {
+      hideError('registerError');
+      const fullName = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
       
-      if (urlParams.get('kyc') === 'required') {
-        showBVN();
-      } else if (token) {
-        // Already logged in, go to dashboard
-        window.location.href = '/dashboard.html'; 
+      if (!email || !password) {
+        showError('registerError', 'Email and password required');
+        return;
       }
-    }
-
-    // === LOGIN ===
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('loginButton');
-      btn.disabled = true;
-      btn.textContent = 'Logging in...';
-
+      
       try {
-        const res = await fetch(`${API_URL}/login`, {
+        const res = await fetch(`${API_URL}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: document.getElementById('loginEmail').value,
-            password: document.getElementById('loginPassword').value
-          })
+          body: JSON.stringify({ fullName, email, password })
         });
-
+        
         const data = await res.json();
-
+        
         if (!res.ok) {
-          throw new Error(data.message || 'Login failed');
-        }
-
-        // THIS IS THE LINE THAT FIXES YOUR LOOP
-        localStorage.setItem(TOKEN_KEY, data.token);
-        
-        showMessage('loginMessage', 'Login successful!', 'success');
-        
-        // Check if KYC needed
-        setTimeout(() => {
-          if (data.user && data.user.kycTier === 0) {
-            showBVN();
-          } else {
-            window.location.href = '/dashboard.html';
-          }
-        }, 1000);
-
-      } catch (err) {
-        showMessage('loginMessage', err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Login';
-      }
-    });
-
-    // === REGISTER ===
-    document.getElementById('registerForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('regButton');
-      btn.disabled = true;
-      btn.textContent = 'Creating...';
-
-      try {
-        const res = await fetch(`${API_URL}/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            password: document.getElementById('password').value,
-            phone: document.getElementById('phone').value,
-            provider: document.getElementById('provider').value,
-            country: document.getElementById('country').value
-          })
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || 'Registration failed');
-        }
-
-        localStorage.setItem(TOKEN_KEY, data.token);
-        showMessage('regMessage', 'Account created! Please verify BVN.', 'success');
-        
-        setTimeout(() => showBVN(), 1500);
-
-      } catch (err) {
-        showMessage('regMessage', err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Account';
-      }
-    });
-
-    // === BVN VERIFY ===
-    document.getElementById('bvnForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('bvnButton');
-      btn.disabled = true;
-      btn.textContent = 'Verifying...';
-
-      try {
-        const token = localStorage.getItem(TOKEN_KEY);
-        if (!token) {
-          logout();
+          showError('registerError', data.message || 'Registration failed');
           return;
         }
-
-        const res = await fetch(`${API_URL}/kyc/verify-bvn`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            bvn: document.getElementById('bvn').value
-          })
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || 'BVN verification failed');
-        }
-
-        showMessage('bvnMessage', 'BVN verified! Redirecting...', 'success');
-        setTimeout(() => {
-          window.location.href = '/dashboard.html';
-        }, 1500);
-
+        
+        setToken(data.token);
+        showBVN(); // Go to BVN after register
+        
       } catch (err) {
-        showMessage('bvnMessage', err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Verify BVN';
+        showError('registerError', 'Network error. Try again.');
       }
-    });
+    }
+    
+    async function handleLogin() {
+      hideError('loginError');
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      
+      if (!email || !password) {
+        showError('loginError', 'Email and password required');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          showError('loginError', data.message || 'Login failed');
+          return;
+        }
+        
+        setToken(data.token);
+        
+        // Check KYC status and route accordingly
+        if (data.user.kycTier === 0) {
+          showBVN();
+        } else {
+          showDashboard(data.user);
+        }
+        
+      } catch (err) {
+        showError('loginError', 'Network error. Try again.');
+      }
+    }
+    
+    function handleLogout() {
+      clearToken();
+      showLogin();
+    }
 
-    // === INIT ===
-    document.addEventListener('DOMContentLoaded', checkAuth);
+    // =========================
+    // 4. BVN VERIFICATION - FIXED WITH TOKEN
+    // =========================
+    async function handleBVN() {
+      hideError('bvnError');
+      hideError('bvnSuccess');
+      
+      const bvn = document.getElementById('bvnInput').value;
+      const token = getToken();
+      
+      if (!token) {
+        showError('bvnError', 'Session expired. Please login again.');
+        showLogin();
+        return;
+      }
+      
+      if (!bvn || bvn.length !== 11) {
+        showError('bvnError', 'BVN must be 11 digits');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/api/bvn`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // THIS IS THE FIX
+          },
+          body: JSON.stringify({ bvn })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          showError('bvnError', data.message || 'BVN verification failed');
+          return;
+        }
+        
+        showSuccess('bvnSuccess', 'BVN verified successfully!');
+        setTimeout(() => showDashboard(data.user), 1500);
+        
+      } catch (err) {
+        showError('bvnError', 'Network error. Try again.');
+      }
+    }
+
+    // =========================
+    // 5. AUTO-LOGIN ON PAGE LOAD
+    // =========================
+    async function checkAuth() {
+      const token = getToken();
+      if (!token) {
+        showLogin();
+        return;
+      }
+      
+      try {
+        const res = await fetch(`${API_URL}/api/user`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) {
+          clearToken();
+          showLogin();
+          return;
+        }
+        
+        const data = await res.json();
+        
+        if (data.user.kycTier === 0) {
+          showBVN();
+        } else {
+          showDashboard(data.user);
+        }
+        
+      } catch (err) {
+        clearToken();
+        showLogin();
+      }
+    }
+    
+    // Run on page load
+    checkAuth();
   </script>
 </body>
 </html>
