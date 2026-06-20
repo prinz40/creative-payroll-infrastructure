@@ -1,3 +1,5 @@
+   const bcrypt = require('bcryptjs');
+   const jwt = require('jsonwebtoken');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -31,17 +33,35 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    // Your existing login logic here - MUST return user data + token
-    // Example:
-    // const user = await User.findOne({ email });
-    // if (!user) return res.status(400).json({ success: false, message: 'User not found' });
+    
+    const User = mongoose.model('User');
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Invalid password' });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '7d' }
+    );
+
     res.json({ 
       success: true, 
-      user: { email, kycTier: 0, kycStatus: 'unverified' }, // Replace with real user
-      token: 'jwt_token_here' 
+      user: { 
+        email: user.email, 
+        kycTier: user.kycTier || 0, 
+        kycStatus: user.kycStatus || 'unverified' 
+      },
+      token: token 
     });
   } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
