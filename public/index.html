@@ -84,14 +84,31 @@
       font-size: 14px;
     }
     .hidden { display: none; }
+    .loader { text-align: center; }
+    .spinner { 
+      border: 3px solid #30363d; 
+      border-top: 3px solid #58a6ff; 
+      border-radius: 50%; 
+      width: 40px; 
+      height: 40px; 
+      animation: spin 1s linear infinite; 
+      margin: 0 auto 20px; 
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>CreativePay</h1>
-    
+
+    <!-- LOADING STATE -->
+    <div id="loader" class="loader">
+      <div class="spinner"></div>
+      <p>Loading CreativePay...</p>
+    </div>
+
     <!-- LOGIN FORM -->
-    <div id="loginForm">
+    <div id="loginForm" class="hidden">
       <h2>Login</h2>
       <div id="loginError" class="error hidden"></div>
       <input type="email" id="loginEmail" placeholder="Email" />
@@ -125,15 +142,6 @@
       <button onclick="handleBVN()">Verify BVN</button>
       <div class="link" onclick="handleLogout()">Logout</div>
     </div>
-
-    <!-- DASHBOARD -->
-    <div id="dashboard" class="hidden">
-      <h2>Dashboard</h2>
-      <div class="success">KYC Tier 1 Verified ✅</div>
-      <p style="margin: 20px 0; text-align: center;">Welcome to CreativePay!</p>
-      <p style="margin: 10px 0; text-align: center;" id="userEmail"></p>
-      <div class="link" onclick="handleLogout()">Logout</div>
-    </div>
   </div>
 
   <script>
@@ -141,65 +149,58 @@
     // 1. GLOBAL STATE & HELPERS
     // =========================
     const API_URL = ''; // Same domain, no CORS needed
-    
+
     function getToken() {
       return localStorage.getItem('token');
     }
-    
+
     function setToken(token) {
       localStorage.setItem('token', token);
     }
-    
+
     function clearToken() {
       localStorage.removeItem('token');
     }
-    
+
     function showError(elementId, message) {
       const el = document.getElementById(elementId);
       el.textContent = message;
       el.classList.remove('hidden');
     }
-    
+
     function hideError(elementId) {
       document.getElementById(elementId).classList.add('hidden');
     }
-    
+
     function showSuccess(elementId, message) {
       const el = document.getElementById(elementId);
       el.textContent = message;
       el.classList.remove('hidden');
     }
 
+    function hideAll() {
+      document.getElementById('loader').classList.add('hidden');
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('registerForm').classList.add('hidden');
+      document.getElementById('bvnForm').classList.add('hidden');
+    }
+
     // =========================
     // 2. PAGE NAVIGATION
     // =========================
     function showLogin() {
+      hideAll();
       document.getElementById('loginForm').classList.remove('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('bvnForm').classList.add('hidden');
-      document.getElementById('dashboard').classList.add('hidden');
     }
-    
+
     function showRegister() {
-      document.getElementById('loginForm').classList.add('hidden');
+      hideAll();
       document.getElementById('registerForm').classList.remove('hidden');
-      document.getElementById('bvnForm').classList.add('hidden');
-      document.getElementById('dashboard').classList.add('hidden');
     }
-    
+
     function showBVN() {
-      document.getElementById('loginForm').classList.add('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
+      hideAll();
       document.getElementById('bvnForm').classList.remove('hidden');
-      document.getElementById('dashboard').classList.add('hidden');
-    }
-    
-    function showDashboard(user) {
-      document.getElementById('loginForm').classList.add('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('bvnForm').classList.add('hidden');
-      document.getElementById('dashboard').classList.remove('hidden');
-      document.getElementById('userEmail').textContent = user.email;
     }
 
     // =========================
@@ -210,158 +211,168 @@
       const fullName = document.getElementById('registerName').value;
       const email = document.getElementById('registerEmail').value;
       const password = document.getElementById('registerPassword').value;
-      
+
       if (!email || !password) {
         showError('registerError', 'Email and password required');
         return;
       }
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/register`, {
+        const res = await fetch(`${API_URL}/api/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fullName, email, password })
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok) {
-          showError('registerError', data.message || 'Registration failed');
+          showError('registerError', data.error || 'Registration failed');
           return;
         }
-        
+
         setToken(data.token);
-        showBVN(); // Go to BVN after register
-        
+        showBVN();
+
       } catch (err) {
         showError('registerError', 'Network error. Try again.');
       }
     }
-    
+
     async function handleLogin() {
       hideError('loginError');
       const email = document.getElementById('loginEmail').value;
       const password = document.getElementById('loginPassword').value;
-      
+
       if (!email || !password) {
         showError('loginError', 'Email and password required');
         return;
       }
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/login`, {
+        const res = await fetch(`${API_URL}/api/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok) {
-          showError('loginError', data.message || 'Login failed');
+          showError('loginError', data.error || 'Login failed');
           return;
         }
-        
+
         setToken(data.token);
-        
+
         // Check KYC status and route accordingly
         if (data.user.kycTier === 0) {
           showBVN();
         } else {
-          showDashboard(data.user);
+          // KYC verified - redirect to server wallet UI
+          window.location.href = '/?token=' + data.token;
         }
-        
+
       } catch (err) {
         showError('loginError', 'Network error. Try again.');
       }
     }
-    
+
     function handleLogout() {
       clearToken();
       showLogin();
     }
 
     // =========================
-    // 4. BVN VERIFICATION - FIXED WITH TOKEN
+    // 4. BVN VERIFICATION
     // =========================
     async function handleBVN() {
       hideError('bvnError');
       hideError('bvnSuccess');
-      
+
       const bvn = document.getElementById('bvnInput').value;
       const token = getToken();
-      
+
       if (!token) {
         showError('bvnError', 'Session expired. Please login again.');
         showLogin();
         return;
       }
-      
+
       if (!bvn || bvn.length !== 11) {
         showError('bvnError', 'BVN must be 11 digits');
         return;
       }
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/bvn`, {
+        const res = await fetch(`${API_URL}/api/kyc/bvn`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // THIS IS THE FIX
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({ bvn })
         });
-        
+
         const data = await res.json();
-        
+
         if (!res.ok) {
-          showError('bvnError', data.message || 'BVN verification failed');
+          showError('bvnError', data.error || 'BVN verification failed');
           return;
         }
-        
+
         showSuccess('bvnSuccess', 'BVN verified successfully!');
-        setTimeout(() => showDashboard(data.user), 1500);
-        
+        // Redirect to server wallet UI after BVN success
+        setTimeout(() => {
+          window.location.href = '/?token=' + token;
+        }, 1500);
+
       } catch (err) {
         showError('bvnError', 'Network error. Try again.');
       }
     }
 
     // =========================
-    // 5. AUTO-LOGIN ON PAGE LOAD
+    // 5. AUTO-LOGIN ON PAGE LOAD - KEY FIX FOR PHASE 2
     // =========================
     async function checkAuth() {
       const token = getToken();
+      
       if (!token) {
+        hideAll();
         showLogin();
         return;
       }
-      
+
       try {
-        const res = await fetch(`${API_URL}/api/user`, {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!res.ok) {
           clearToken();
+          hideAll();
           showLogin();
           return;
         }
-        
+
         const data = await res.json();
-        
+
         if (data.user.kycTier === 0) {
+          hideAll();
           showBVN();
         } else {
-          showDashboard(data.user);
+          // User is logged in + KYC verified = redirect to server wallet UI
+          window.location.href = '/?token=' + token;
         }
-        
+
       } catch (err) {
         clearToken();
+        hideAll();
         showLogin();
       }
     }
-    
+
     // Run on page load
     checkAuth();
   </script>
