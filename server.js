@@ -276,12 +276,86 @@ app.get('/dashboard', async (req, res) => {
     res.redirect('/?error=session_expired');
   }
 });
+// =========================
+// 8. ROOT ROUTE - SHOW WALLET IF LOGGED IN
+// =========================
+app.get('/', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1] || req.query.token;
+    if (!token) {
+      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    const wallet = await Wallet.findOne({ userId: user._id });
+    
+    if (!wallet) {
+      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+
+    res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CreativePay Wallet</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0a0a0a; color:#fff; font-family:system-ui,-apple-system,sans-serif; padding:20px; }
+ .container { max-width:400px; margin:0 auto; }
+ .header { text-align:center; margin:30px 0; }
+ .header h1 { font-size:28px; margin-bottom:10px; }
+ .balance-card { background:linear-gradient(135deg,#1a1a1a,#2d2d2d); padding:30px; border-radius:20px; text-align:center; margin:20px 0; border:1px solid #333; }
+ .balance-label { color:#888; font-size:14px; }
+ .balance { font-size:48px; font-weight:bold; color:#00ff88; margin:10px 0; }
+ .wallet-id { font-size:12px; color:#666; margin-top:10px; word-break:break-all; }
+ .actions { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:30px 0; }
+ .btn { background:#1a1a1a; border:1px solid #333; padding:20px; border-radius:15px; color:#fff; font-size:16px; cursor:pointer; transition:all 0.2s; }
+ .btn:active { transform:scale(0.95); background:#2a2a2a; }
+ .kyc-badge { background:#00ff88; color:#000; padding:8px 15px; border-radius:20px; display:inline-block; font-size:14px; font-weight:bold; }
+ .footer { text-align:center; margin-top:40px; color:#666; font-size:14px; }
+ .logout { background:none; border:1px solid #333; color:#888; padding:10px 20px; border-radius:10px; margin-top:15px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>CreativePay</h1>
+      <div class="kyc-badge">KYC Tier ${user.kycTier} Verified ✓</div>
+    </div>
+    
+    <div class="balance-card">
+      <div class="balance-label">Available Balance</div>
+      <div class="balance">₦${wallet.balance.toLocaleString()}.00</div>
+      <div class="wallet-id">Wallet ID: ${wallet.walletId}</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="alert('Send feature coming in Phase 3')">Send</button>
+      <button class="btn" onclick="alert('Receive feature coming in Phase 3')">Receive</button>
+      <button class="btn" onclick="alert('Scan QR coming in Phase 3')">Scan QR</button>
+      <button class="btn" onclick="alert('Transaction history coming in Phase 3')">History</button>
+    </div>
+
+    <div class="footer">
+      <p>${user.email}</p>
+      <button class="logout" onclick="localStorage.removeItem('token');window.location='/'">Logout</button>
+    </div>
+  </div>
+</body>
+</html>
+    `);
+  } catch (error) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  }
+});
 
 // =========================
-// 8. CATCH-ALL FOR SPA
+// 9. CATCH-ALL FOR OTHER ROUTES
 // =========================
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.redirect('/');
 });
 
 // =========================
