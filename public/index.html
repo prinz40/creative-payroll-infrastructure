@@ -204,7 +204,7 @@
     }
 
     // =========================
-    // 3. AUTH FUNCTIONS
+    // 3. AUTH FUNCTIONS - FIXED ROUTES
     // =========================
     async function handleRegister() {
       hideError('registerError');
@@ -218,7 +218,7 @@
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/auth/register`, {
+        const res = await fetch(`${API_URL}/api/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fullName, email, password })
@@ -227,7 +227,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError('registerError', data.error || 'Registration failed');
+          showError('registerError', data.message || 'Registration failed');
           return;
         }
 
@@ -250,7 +250,7 @@
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/auth/login`, {
+        const res = await fetch(`${API_URL}/api/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
@@ -259,7 +259,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError('loginError', data.error || 'Login failed');
+          showError('loginError', data.message || 'Login failed');
           return;
         }
 
@@ -284,7 +284,7 @@
     }
 
     // =========================
-    // 4. BVN VERIFICATION
+    // 4. BVN VERIFICATION - FIXED ROUTE
     // =========================
     async function handleBVN() {
       hideError('bvnError');
@@ -305,7 +305,7 @@
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/kyc/bvn`, {
+        const res = await fetch(`${API_URL}/api/bvn`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -317,7 +317,7 @@
         const data = await res.json();
 
         if (!res.ok) {
-          showError('bvnError', data.error || 'BVN verification failed');
+          showError('bvnError', data.message || 'BVN verification failed');
           return;
         }
 
@@ -333,7 +333,7 @@
     }
 
     // =========================
-    // 5. AUTO-LOGIN ON PAGE LOAD - KEY FIX FOR PHASE 2
+    // 5. AUTO-LOGIN ON PAGE LOAD - FIXED ROUTE
     // =========================
     async function checkAuth() {
       const token = getToken();
@@ -345,7 +345,7 @@
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/auth/me`, {
+        const res = await fetch(`${API_URL}/api/user`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
