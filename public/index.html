@@ -106,7 +106,7 @@
       margin: 0 auto 20px; 
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    
+
     /* WALLET UI STYLES */
     .wallet-header {
       display: flex;
@@ -160,6 +160,12 @@
       margin-top: 20px;
     }
     .logout-btn:hover { background: #f85149 !important; }
+    .fund-btn {
+      background: #2563eb !important;
+      grid-column: span 2;
+      font-weight: 600;
+    }
+    .fund-btn:hover { background: #1d4ed8 !important; }
   </style>
 </head>
 <body>
@@ -224,6 +230,10 @@
     </div>
 
     <div class="wallet-actions">
+      <div class="action-btn fund-btn" onclick="fundWallet()" id="fundWalletBtn">
+        <div class="action-icon">➕</div>
+        <div class="action-label">Fund Wallet</div>
+      </div>
       <div class="action-btn" onclick="alert('Send feature coming soon')">
         <div class="action-icon">📤</div>
         <div class="action-label">Send</div>
@@ -245,6 +255,9 @@
     <button class="logout-btn" onclick="handleLogout()">Logout</button>
   </div>
 
+  <!-- PAYSTACK INLINE SCRIPT -->
+  <script src="https://js.paystack.co/v1/inline.js"></script>
+  
   <script>
     // =========================
     // 1. GLOBAL STATE & HELPERS
@@ -315,13 +328,84 @@
       currentUser = user;
       document.getElementById('walletBalance').textContent = user.walletBalance?.toFixed(2) || '0.00';
       document.getElementById('walletId').textContent = user.walletId || 'CPY-XXXXX';
-      
+
       if (user.kycTier >= 1) {
         document.getElementById('kycBadge').textContent = `KYC Tier ${user.kycTier} Verified ✓`;
         document.getElementById('kycBadge').style.background = '#238636';
       } else {
         document.getElementById('kycBadge').textContent = 'KYC Not Verified';
         document.getElementById('kycBadge').style.background = '#da3633';
+      }
+    }
+
+    // =========================
+    // 2.1 PAYSTACK FUNDING - NEW
+    // =========================
+    function fundWallet() {
+      if (!currentUser) {
+        alert('Please log in first.');
+        return;
+      }
+      
+      const amount = prompt('Enter amount to fund (₦):', '100');
+      if (!amount || isNaN(amount) || amount < 100) {
+        alert('Minimum funding amount is ₦100');
+        return;
+      }
+      
+      const amountInKobo = parseInt(amount) * 100;
+      const btn = document.getElementById('fundWalletBtn');
+      btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-label">Processing...</div>';
+      btn.style.pointerEvents = 'none';
+      
+      let handler = PaystackPop.setup({
+        key: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxx', // REPLACE WITH YOUR PAYSTACK PUBLIC KEY
+        email: currentUser.email,
+        amount: amountInKobo,
+        currency: 'NGN',
+        ref: 'CPY-FUND-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        metadata: {
+          userId: currentUser._id,
+          custom_fields: [{
+            display_name: "Wallet ID",
+            variable_name: "wallet_id", 
+            value: currentUser.walletId
+          }]
+        },
+        callback: function(response) {
+          btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
+          btn.style.pointerEvents = 'auto';
+          verifyPaymentOnServer(response.reference);
+        },
+        onClose: function() {
+          btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
+          btn.style.pointerEvents = 'auto';
+          alert('Payment window closed.');
+        }
+      });
+      handler.openIframe();
+    }
+    
+    async function verifyPaymentOnServer(reference) {
+      try {
+        const res = await fetch(`${API_URL}/api/fund-wallet/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`
+          },
+          body: JSON.stringify({ reference: reference })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+          alert('Wallet funded successfully! New balance: ₦' + data.newBalance.toFixed(2));
+          await checkAuth(); // Refresh user data
+        } else {
+          alert('Verification failed: ' + (data.message || 'Please contact support'));
+        }
+      } catch (err) {
+        alert('Network error verifying payment. Please contact support with ref: ' + reference);
       }
     }
 
@@ -444,7 +528,6 @@
 
         showSuccess('bvnSuccess', 'BVN verified successfully!');
         setTimeout(async () => {
-          // Refetch user to get updated wallet data
           await checkAuth();
         }, 1500);
 
@@ -459,7 +542,7 @@
     async function checkAuth() {
       showLoader();
       const token = getToken();
-      
+
       if (!token) {
         showAuth();
         showLogin();
