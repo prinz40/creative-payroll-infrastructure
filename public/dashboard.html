@@ -100,7 +100,7 @@
       <div class="card">
         <h3 style="margin-bottom: 16px;">Quick Actions</h3>
         <div style="display: grid; gap: 12px;">
-          <!-- PAYSTACK FUND WALLET BUTTON - REPLACED -->
+          <!-- PAYSTACK FUND WALLET BUTTON - ALREADY HERE -->
           <button onclick="fundWallet()" id="fundWalletBtn" class="fund-btn">
             + Fund Wallet
           </button>
@@ -122,7 +122,7 @@
   <!-- CRITICAL: Load app.js - This runs fetchUserProfile() + KYC gate -->
   <script src="/app.js"></script>
   
-  <!-- PAYSTACK INLINE SCRIPT ADDED HERE -->
+  <!-- PAYSTACK INLINE SCRIPT - ALREADY HERE -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
 
   <script>
@@ -157,9 +157,8 @@
       }
     }
 
-    // PAYSTACK FUND WALLET FUNCTION - ADDED
+    // PAYSTACK FUND WALLET FUNCTION - ALREADY HERE
     function fundWallet() {
-      // Check if user is loaded
       if (!window.currentUser || !window.currentUser.email) {
         alert('Please wait, loading your account...');
         return;
@@ -181,26 +180,16 @@
       let handler = PaystackPop.setup({
         key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         email: userEmail,
-        amount: amount * 100, // Paystack uses kobo
+        amount: amount * 100,
         currency: 'NGN',
         ref: 'CP_' + Date.now() + '_' + userId,
-        metadata: {
-          user_id: userId,
-          custom_fields: [
-            {
-              display_name: "User ID",
-              variable_name: "user_id", 
-              value: userId
-            }
-          ]
-        },
+        metadata: { user_id: userId },
         onClose: function(){
           alert('Payment cancelled');
           fundBtn.disabled = false;
           fundBtn.innerText = '+ Fund Wallet';
         },
         callback: function(response){
-          // Payment successful - verify on backend
           verifyPaymentOnServer(response.reference, amount, userId);
         }
       });
@@ -227,7 +216,7 @@
       .then(data => {
         if(data.success) {
           alert(`Success! ₦${amount} added to your wallet`);
-          location.reload(); // Refresh to show new balance
+          location.reload();
         } else {
           alert('Verification failed: ' + data.message);
           fundBtn.disabled = false;
@@ -243,7 +232,6 @@
 
     // app.js will call fetchUserProfile() - we hook into it
     document.addEventListener('DOMContentLoaded', () => {
-      // Wait for app.js to fetch and populate window.currentUser
       const checkUser = setInterval(() => {
         if (window.currentUser) {
           clearInterval(checkUser);
@@ -253,7 +241,6 @@
         }
       }, 100);
 
-      // Fallback: show dashboard after 3s even if app.js fails
       setTimeout(() => {
         clearInterval(checkUser);
         document.getElementById('loadingState').style.display = 'none';
