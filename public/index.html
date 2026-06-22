@@ -257,7 +257,7 @@
 
   <!-- PAYSTACK INLINE SCRIPT -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
-  
+
   <script>
     // =========================
     // 1. GLOBAL STATE & HELPERS
@@ -339,27 +339,27 @@
     }
 
     // =========================
-    // 2.1 PAYSTACK FUNDING - NEW
+    // 2.1 PAYSTACK FUNDING - UPDATED WITH YOUR KEY
     // =========================
     function fundWallet() {
       if (!currentUser) {
         alert('Please log in first.');
         return;
       }
-      
+
       const amount = prompt('Enter amount to fund (₦):', '100');
       if (!amount || isNaN(amount) || amount < 100) {
         alert('Minimum funding amount is ₦100');
         return;
       }
-      
+
       const amountInKobo = parseInt(amount) * 100;
       const btn = document.getElementById('fundWalletBtn');
       btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-label">Processing...</div>';
       btn.style.pointerEvents = 'none';
-      
+
       let handler = PaystackPop.setup({
-        key: 'pk_test_xxxxxxxxxxxxxxxxxxxxxxxx', // REPLACE WITH YOUR PAYSTACK PUBLIC KEY
+        key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e', // YOUR KEY INSERTED
         email: currentUser.email,
         amount: amountInKobo,
         currency: 'NGN',
@@ -385,7 +385,7 @@
       });
       handler.openIframe();
     }
-    
+
     async function verifyPaymentOnServer(reference) {
       try {
         const res = await fetch(`${API_URL}/api/fund-wallet/verify`, {
@@ -396,7 +396,7 @@
           },
           body: JSON.stringify({ reference: reference })
         });
-        
+
         const data = await res.json();
         if (res.ok) {
           alert('Wallet funded successfully! New balance: ₦' + data.newBalance.toFixed(2));
