@@ -4,26 +4,35 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
 
 // =========================
-// 1. MIDDLEWARE
+// 1. ENV VALIDATION
+// =========================
+if (!process.env.PAYSTACK_SECRET_KEY) {
+  console.error('❌ FATAL: PAYSTACK_SECRET_KEY missing in .env');
+  process.exit(1);
+}
+
+// =========================
+// 2. MIDDLEWARE
 // =========================
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
-// 2. DATABASE CONNECTION
+// 3. DATABASE CONNECTION
 // =========================
 mongoose.connect(process.env.MONGODB_URI)
-.then(() => console.log('✅ MongoDB Connected - Creativepay Cluster'))
+.then(() => console.log('✅ MongoDB Connected - CreativePay Cluster'))
 .catch(err => console.error('❌ MongoDB Error:', err));
 
 // =========================
-// 3. DATABASE MODELS
+// 4. DATABASE MODELS
 // =========================
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -35,10 +44,24 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);
+
 const Wallet = require('./models/Wallet');
 
+// NEW: Transaction model to prevent double-credit
+const transactionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  reference: { type: String, required: true, unique: true },
+  amount: { type: Number, required: true }, // in kobo
+  status: { type: String, enum: ['success', 'failed', 'pending'], default: 'pending' },
+  type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
+  channel: { type: String, default: 'paystack' },
+  metadata: { type: Object }
+}, { timestamps: true });
+
+const Transaction = mongoose.model('Transaction', transactionSchema);
+
 // =========================
-// 4. AUTH MIDDLEWARE
+// 5. AUTH MIDDLEWARE
 // =========================
 const authMiddleware = async (req, res, next) => {
   try {
@@ -55,14 +78,14 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // =========================
-// 5. API ROUTES
+// 6. API ROUTES
 // =========================
 
 // REGISTER
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
-    if (!email ||!password) {
+    if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
     if (password.length < 6) {
@@ -99,7 +122,7 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email ||!password) {
+    if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
     const user = await User.findOne({ email: email.toLowerCase() });
@@ -130,7 +153,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
     const userId = req.user.id;
-    if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
+    if (!bvn || bvn.length !== 11 || !/^\d+$/.test(bvn)) {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
     const user = await User.findByIdAndUpdate(
@@ -181,7 +204,7 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   }
 });
 
-// PHASE 2: WALLET BALANCE API
+// WALLET BALANCE API
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   try {
     const wallet = await Wallet.findOne({ userId: req.user.id });
@@ -195,175 +218,104 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   }
 });
 
+// NEW: FUND WALLET VERIFY - PHASE 3 SPRINT 1
+app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
+  try {
+    const { reference } = req.body;
+    const userId = req.user.id;
+
+    if (!reference) {
+      return res.status(400).json({ success: false, message: 'Transaction reference required' });
+    }
+
+    console.log(`🔍 Verifying payment: ${reference} for user: ${userId}`);
+
+    // 1. Check if already processed to prevent double-credit
+    const existingTxn = await Transaction.findOne({ reference });
+    if (existingTxn && existingTxn.status === 'success') {
+      const wallet = await Wallet.findOne({ userId });
+      return res.json({ 
+        success: true, 
+        message: 'Transaction already verified', 
+        newBalance: wallet.balance,
+        amount: existingTxn.amount / 100 
+      });
+    }
+
+    // 2. Verify with Paystack
+    const paystackRes = await axios.get(
+      `https://api.paystack.co/transaction/verify/${reference}`,
+      { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } }
+    );
+
+    const { status, amount, currency } = paystackRes.data.data;
+
+    if (status !== 'success') {
+      await Transaction.create({ userId, reference, amount, status: 'failed', type: 'credit' });
+      return res.status(400).json({ success: false, message: 'Payment not successful' });
+    }
+
+    // 3. Credit wallet atomically - amount is in kobo, convert to naira
+    const amountNaira = amount / 100;
+    const wallet = await Wallet.findOneAndUpdate(
+      { userId },
+      { $inc: { balance: amountNaira } },
+      { new: true, upsert: true }
+    );
+
+    // 4. Log transaction
+    await Transaction.create({
+      userId,
+      reference,
+      amount,
+      status: 'success',
+      type: 'credit',
+      channel: 'paystack',
+      metadata: paystackRes.data.data
+    });
+
+    console.log(`✅ Wallet credited: ₦${amountNaira} for ${req.user.email}. New balance: ₦${wallet.balance}`);
+
+    res.json({
+      success: true,
+      message: 'Wallet funded successfully',
+      newBalance: wallet.balance,
+      amount: amountNaira,
+      reference
+    });
+
+  } catch (error) {
+    console.error('❌ Verify Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Payment verification failed' });
+  }
+});
+
 // =========================
-// 6. STATIC FILES
+// 7. STATIC FILES
 // =========================
 app.use(express.static(path.join(__dirname, 'public')));
 
 // =========================
-// 7. WALLET DASHBOARD - PHASE 2
+// 8. ROOT ROUTE
 // =========================
-app.get('/dashboard', async (req, res) => {
-  try {
-    // Check for token in query or header for direct browser access
-    const token = req.headers.authorization?.split(' ')[1] || req.query.token;
-    if (!token) {
-      return res.redirect('/');
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-    const wallet = await Wallet.findOne({ userId: user._id });
-    
-    if (!wallet) {
-      return res.redirect('/?error=no_wallet');
-    }
-
-    res.send(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>CreativePay Wallet</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#0a0a0a; color:#fff; font-family:system-ui,-apple-system,sans-serif; padding:20px; }
-   .container { max-width:400px; margin:0 auto; }
-   .header { text-align:center; margin:30px 0; }
-   .header h1 { font-size:28px; margin-bottom:10px; }
-   .balance-card { background:linear-gradient(135deg,#1a1a1a,#2d2d2d); padding:30px; border-radius:20px; text-align:center; margin:20px 0; border:1px solid #333; }
-   .balance-label { color:#888; font-size:14px; }
-   .balance { font-size:48px; font-weight:bold; color:#00ff88; margin:10px 0; }
-   .wallet-id { font-size:12px; color:#666; margin-top:10px; word-break:break-all; }
-   .actions { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:30px 0; }
-   .btn { background:#1a1a1a; border:1px solid #333; padding:20px; border-radius:15px; color:#fff; font-size:16px; cursor:pointer; transition:all 0.2s; }
-   .btn:active { transform:scale(0.95); background:#2a2a2a; }
-   .kyc-badge { background:#00ff88; color:#000; padding:8px 15px; border-radius:20px; display:inline-block; font-size:14px; font-weight:bold; }
-   .footer { text-align:center; margin-top:40px; color:#666; font-size:14px; }
-   .logout { background:none; border:1px solid #333; color:#888; padding:10px 20px; border-radius:10px; margin-top:15px; cursor:pointer; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>CreativePay</h1>
-      <div class="kyc-badge">KYC Tier ${user.kycTier} Verified ✓</div>
-    </div>
-    
-    <div class="balance-card">
-      <div class="balance-label">Available Balance</div>
-      <div class="balance">₦${wallet.balance.toLocaleString()}.00</div>
-      <div class="wallet-id">Wallet ID: ${wallet.walletId}</div>
-    </div>
-
-    <div class="actions">
-      <button class="btn" onclick="alert('Send feature coming in Phase 3')">Send</button>
-      <button class="btn" onclick="alert('Receive feature coming in Phase 3')">Receive</button>
-      <button class="btn" onclick="alert('Scan QR coming in Phase 3')">Scan QR</button>
-      <button class="btn" onclick="alert('Transaction history coming in Phase 3')">History</button>
-    </div>
-
-    <div class="footer">
-      <p>${user.email}</p>
-      <button class="logout" onclick="localStorage.removeItem('token');window.location='/'">Logout</button>
-    </div>
-  </div>
-</body>
-</html>
-    `);
-  } catch (error) {
-    console.error('Dashboard Error:', error);
-    res.redirect('/?error=session_expired');
-  }
-});
-// =========================
-// 8. ROOT ROUTE - SHOW WALLET IF LOGGED IN
-// =========================
-app.get('/', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1] || req.query.token;
-    if (!token) {
-      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-    const wallet = await Wallet.findOne({ userId: user._id });
-    
-    if (!wallet) {
-      return res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
-
-    res.send(`
-<!DOCTYPE html>
-<html>
-<head>
-  <title>CreativePay Wallet</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:#0a0a0a; color:#fff; font-family:system-ui,-apple-system,sans-serif; padding:20px; }
- .container { max-width:400px; margin:0 auto; }
- .header { text-align:center; margin:30px 0; }
- .header h1 { font-size:28px; margin-bottom:10px; }
- .balance-card { background:linear-gradient(135deg,#1a1a1a,#2d2d2d); padding:30px; border-radius:20px; text-align:center; margin:20px 0; border:1px solid #333; }
- .balance-label { color:#888; font-size:14px; }
- .balance { font-size:48px; font-weight:bold; color:#00ff88; margin:10px 0; }
- .wallet-id { font-size:12px; color:#666; margin-top:10px; word-break:break-all; }
- .actions { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:30px 0; }
- .btn { background:#1a1a1a; border:1px solid #333; padding:20px; border-radius:15px; color:#fff; font-size:16px; cursor:pointer; transition:all 0.2s; }
- .btn:active { transform:scale(0.95); background:#2a2a2a; }
- .kyc-badge { background:#00ff88; color:#000; padding:8px 15px; border-radius:20px; display:inline-block; font-size:14px; font-weight:bold; }
- .footer { text-align:center; margin-top:40px; color:#666; font-size:14px; }
- .logout { background:none; border:1px solid #333; color:#888; padding:10px 20px; border-radius:10px; margin-top:15px; cursor:pointer; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>CreativePay</h1>
-      <div class="kyc-badge">KYC Tier ${user.kycTier} Verified ✓</div>
-    </div>
-    
-    <div class="balance-card">
-      <div class="balance-label">Available Balance</div>
-      <div class="balance">₦${wallet.balance.toLocaleString()}.00</div>
-      <div class="wallet-id">Wallet ID: ${wallet.walletId}</div>
-    </div>
-
-    <div class="actions">
-      <button class="btn" onclick="alert('Send feature coming in Phase 3')">Send</button>
-      <button class="btn" onclick="alert('Receive feature coming in Phase 3')">Receive</button>
-      <button class="btn" onclick="alert('Scan QR coming in Phase 3')">Scan QR</button>
-      <button class="btn" onclick="alert('Transaction history coming in Phase 3')">History</button>
-    </div>
-
-    <div class="footer">
-      <p>${user.email}</p>
-      <button class="logout" onclick="localStorage.removeItem('token');window.location='/'">Logout</button>
-    </div>
-  </div>
-</body>
-</html>
-    `);
-  } catch (error) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  }
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // =========================
-// 9. CATCH-ALL FOR OTHER ROUTES
+// 9. CATCH-ALL
 // =========================
 app.get('*', (req, res) => {
   res.redirect('/');
 });
 
 // =========================
-// 9. START SERVER
+// 10. START SERVER
 // =========================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`✅ JWT Secret: ${process.env.JWT_SECRET? 'Loaded' : 'MISSING'}`);
-  console.log(`✅ MongoDB: ${process.env.MONGODB_URI? 'Connected' : 'MISSING'}`);
-  console.log(`🚀 CreativePay Phase 2 server running on port ${PORT}`);
+  console.log(`✅ JWT Secret: ${process.env.JWT_SECRET ? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY ? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ MongoDB: ${process.env.MONGODB_URI ? 'Connected' : 'MISSING'}`);
+  console.log(`🚀 CreativePay Phase 3 server running on port ${PORT}`);
 });
