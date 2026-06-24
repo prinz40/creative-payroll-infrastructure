@@ -9,7 +9,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
-app.set('trust proxy', 1); // ✅ FIX #1: Makes Paystack webhooks work on Render
+app.set('trust proxy', 1);
 
 // =========================
 // 1. ENV VALIDATION
@@ -37,7 +37,7 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: { success: false, message: 'Too many requests, try again later' },
-  standardHeaders: true, // ✅ FIX #2: Helps with X-Forwarded-For
+  standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api/', limiter);
@@ -114,19 +114,39 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // =========================
-// 6. HELPER: FORMAT USER RESPONSE
+// 6. HELPER: BUILD USER RESPONSE - FIXED VERSION
 // =========================
-const formatUserResponse = async (user) => {
-  const wallet = await Wallet.findOne({ userId: user._id });
-  return {
-    email: user.email,
-    fullName: user.fullName,
-    kycTier: user.kycTier,
-    kycStatus: user.kycStatus,
-    balance: wallet?.balance || 0,
-    walletId: wallet?.walletId || null,
-    createdAt: user.createdAt
-  };
+const buildUserResponse = async (user) => {
+  try {
+    const wallet = await Wallet.findOne({ userId: user._id }).lean();
+
+    console.log(`🔍 Building response for ${user.email}`);
+    console.log(`🔍 Wallet found:`, wallet? 'YES' : 'NO');
+    console.log(`🔍 Balance:`, wallet?.balance);
+
+    return {
+      id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      kycTier: user.kycTier,
+      kycStatus: user.kycStatus,
+      balance: wallet?.balance || 0,
+      walletId: wallet?.walletId || null,
+      createdAt: user.createdAt
+    };
+  } catch (error) {
+    console.error('❌ buildUserResponse Error:', error);
+    return {
+      id: user._id,
+      email: user.email,
+      fullName: user.fullName,
+      kycTier: user.kycTier,
+      kycStatus: user.kycStatus,
+      balance: 0,
+      walletId: null,
+      createdAt: user.createdAt
+    };
+  }
 };
 
 // =========================
@@ -159,8 +179,7 @@ app.post('/api/register', async (req, res) => {
     });
 
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    const userData = await formatUserResponse(user);
-    userData.id = user._id; // ✅ FIX #3: Added for Paystack
+    const userData = await buildUserResponse(user);
 
     console.log('✅ User registered:', user.email);
     res.status(201).json({
@@ -175,7 +194,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// LOGIN - ALWAYS FRESH WALLET
+// LOGIN
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -189,8 +208,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    const userData = await formatUserResponse(user);
-    userData.id = user._id; // ✅ FIX #4: Added for Paystack
+    const userData = await buildUserResponse(user);
 
     console.log('✅ User logged in:', user.email, 'Balance:', userData.balance);
     res.json({
@@ -236,8 +254,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
     });
 
     const user = await User.findById(req.user.id);
-    const userData = await formatUserResponse(user);
-    userData.id = user._id; // ✅ FIX #5: Added for consistency
+    const userData = await buildUserResponse(user);
 
     console.log('✅ BVN Verified for:', user.email);
     res.json({
@@ -253,20 +270,20 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   }
 });
 
-// GET CURRENT USER
+// GET CURRENT USER - BULLETPROOF VERSION
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    console.log('🔍 /api/user called for userId:', req.user.id);
 
-    // ✅ FIX: Fetch wallet and inject balance into response
-    const wallet = await Wallet.findOne({ userId: req.user.id });
+    const user = await User.findById(req.user.id).select('-password').lean();
+    if (!user) {
+      console.log('❌ User not found in DB');
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-    const userData = await formatUserResponse(user);
-    userData.id = user._id;
-    userData.balance = wallet?.balance || 0; // ← THIS WAS MISSING
-    userData.walletId = wallet?.walletId || null;
+    const userData = await buildUserResponse(user);
 
+    console.log('✅ Final userData sent:', JSON.stringify(userData));
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error('❌ User Fetch Error:', error);
@@ -277,7 +294,7 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 // WALLET BALANCE
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   try {
-    const wallet = await Wallet.findOne({ userId: req.user.id });
+    const wallet = await Wallet.findOne({ userId: req.user.id }).lean();
     if (!wallet) {
       return res.status(404).json({ success: false, message: 'Wallet not found. Complete KYC first.' });
     }
@@ -306,24 +323,22 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 
     console.log(`🔍 Verifying payment: ${reference} for user: ${req.user.email}`);
 
-    // Check if already processed
     const existingTxn = await Transaction.findOne({ reference });
     if (existingTxn?.status === 'success') {
-      const wallet = await Wallet.findOne({ userId });
+      const wallet = await Wallet.findOne({ userId }).lean();
       return res.json({
         success: true,
         message: 'Transaction already verified',
-        newBalance: wallet.balance,
+        newBalance: wallet?.balance || 0,
         amount: existingTxn.amount / 100
       });
     }
 
-    // Verify with Paystack
     const paystackRes = await axios.get(
       `https://api.paystack.co/transaction/verify/${reference}`,
-      { 
+      {
         headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
-        timeout: 10000 
+        timeout: 10000
       }
     );
 
@@ -336,13 +351,12 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
     const amountNaira = amount / 100;
     let wallet;
 
-    // ATOMIC TRANSACTION
     await session.withTransaction(async () => {
       wallet = await Wallet.findOneAndUpdate(
         { userId },
         { $inc: { balance: amountNaira } },
         { new: true, upsert: true, session }
-      );
+      ).lean();
 
       await Transaction.findOneAndUpdate(
         { reference },
