@@ -9,6 +9,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1); // ✅ FIX #1: Makes Paystack webhooks work on Render
 
 // =========================
 // 1. ENV VALIDATION
@@ -35,7 +36,9 @@ app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { success: false, message: 'Too many requests, try again later' }
+  message: { success: false, message: 'Too many requests, try again later' },
+  standardHeaders: true, // ✅ FIX #2: Helps with X-Forwarded-For
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
@@ -43,7 +46,9 @@ app.use('/api/', limiter);
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  message: { success: false, message: 'Too many login attempts' }
+  message: { success: false, message: 'Too many login attempts' },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/login', authLimiter);
 app.use('/api/register', authLimiter);
@@ -138,12 +143,12 @@ app.post('/api/register', async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
     }
-    
+
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
-    
+
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({
       email: email.toLowerCase(),
@@ -152,10 +157,11 @@ app.post('/api/register', async (req, res) => {
       kycTier: 0,
       kycStatus: 'unverified'
     });
-    
+
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const userData = await formatUserResponse(user);
-    
+    userData.id = user._id; // ✅ FIX #3: Added for Paystack
+
     console.log('✅ User registered:', user.email);
     res.status(201).json({
       success: true,
@@ -176,15 +182,16 @@ app.post('/api/login', async (req, res) => {
     if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
-    
+
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user ||!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
-    
+
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const userData = await formatUserResponse(user);
-    
+    userData.id = user._id; // ✅ FIX #4: Added for Paystack
+
     console.log('✅ User logged in:', user.email, 'Balance:', userData.balance);
     res.json({
       success: true,
@@ -206,7 +213,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
     if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
-    
+
     await session.withTransaction(async () => {
       const user = await User.findByIdAndUpdate(
         req.user.id,
@@ -214,7 +221,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
         { new: true, session }
       );
       if (!user) throw new Error('User not found');
-      
+
       await Wallet.findOneAndUpdate(
         { userId: user._id },
         {
@@ -227,10 +234,11 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
         { upsert: true, new: true, session }
       );
     });
-    
+
     const user = await User.findById(req.user.id);
     const userData = await formatUserResponse(user);
-    
+    userData.id = user._id; // ✅ FIX #5: Added for consistency
+
     console.log('✅ BVN Verified for:', user.email);
     res.json({
       success: true,
@@ -252,7 +260,7 @@ app.get('/api/user', authMiddleware, async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
     const userData = await formatUserResponse(user);
-    userData.id = user._id; // <- NEW LINE ADDED HERE
+    userData.id = user._id; // ✅ FIX #6: Already had this - keeping it
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error('❌ User Fetch Error:', error);
