@@ -89,8 +89,8 @@
 
       <div class="card balance-card">
         <div class="balance-label">Available Balance</div>
-        <div class="balance-amount" id="user-balance">₦0.00</div>
-        <div class="wallet-id" id="wallet-id">Wallet ID: Generating...</div>
+        <div class="balance-amount" id="user-balance">Loading...</div>
+        <div class="wallet-id" id="wallet-id">Wallet ID: Loading...</div>
       </div>
 
       <div class="card">
@@ -123,36 +123,43 @@
     // 1. AUTH + FETCH FRESH DATA ON EVERY LOAD
     // =========================
     document.addEventListener('DOMContentLoaded', async () => {
+      await loadUserData();
+    });
+
+    async function loadUserData() {
       const token = localStorage.getItem(TOKEN_KEY);
       if (!token) return window.location.href = '/';
 
       try {
-        // ✅ FIX #1: Always fetch fresh data from server, never trust cache
+        // Always fetch fresh data from server, never trust cache
         const res = await fetch(`${API_URL}/api/user`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        if (!res.ok) throw new Error('Session expired');
-        
+
+        if (res.status === 401) {
+          throw new Error('Session expired');
+        }
+        if (!res.ok) throw new Error('Server error');
+
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
 
         window.currentUser = data.user;
-        localStorage.setItem('user', JSON.stringify(data.user)); // Update cache
+        localStorage.setItem('user', JSON.stringify(data.user));
         updateDashboard(data.user);
-        
+
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
-        
+
         document.getElementById('output-window').textContent = 
-          `✅ Connected to CreativePay\nUser: ${data.user.email}\nBalance: ₦${data.user.balance.toFixed(2)}`;
+          `✅ Connected to CreativePay\nUser: ${data.user.email}\nBalance: ₦${Number(data.user.balance || 0).toFixed(2)}\nWallet: ${data.user.walletId || 'Pending'}`;
 
       } catch (error) {
         console.error('Load Error:', error);
         document.getElementById('loadingState').textContent = 'Session expired. Please login again.';
         setTimeout(() => logout(), 2000);
       }
-    });
+    }
 
     function logout() {
       localStorage.removeItem(TOKEN_KEY);
@@ -161,7 +168,7 @@
     }
 
     // =========================
-    // 2. UPDATE UI WITH FRESH DATA
+    // 2. UPDATE UI WITH FRESH DATA - BULLETPROOF
     // =========================
     function updateDashboard(userData) {
       document.getElementById('user-email').textContent = userData.email || 'N/A';
@@ -175,26 +182,33 @@
       } else {
         kycBadge.textContent = 'UNVERIFIED';
         kycBadge.className = 'kyc-badge';
+        document.getElementById('kyc-banner').style.display = 'none';
       }
 
-      // ✅ FIX #2: Balance is direct from backend, not nested
-      document.getElementById('user-balance').textContent = `₦${(userData.balance || 0).toFixed(2)}`;
+      // ✅ FIX: Bulletproof balance display
+      const balance = Number(userData.balance || 0);
+      document.getElementById('user-balance').textContent = `₦${balance.toFixed(2)}`;
+      
       document.getElementById('wallet-id').textContent = userData.walletId 
         ? `Wallet ID: ${userData.walletId}` 
-        : 'Wallet ID: Pending KYC';
+        : 'Wallet ID: Complete KYC to activate';
     }
 
     // =========================
-    // 3. FUND WALLET - COMPLETE FLOW
+    // 3. FUND WALLET - COMPLETE FLOW WITH AUTO-REFRESH
     // =========================
     function fundWallet() {
       if (!window.currentUser?.id) {
         alert('Please wait, loading your account...');
         return;
       }
+      if (window.currentUser.kycTier < 1) {
+        alert('Please complete BVN verification before funding your wallet.');
+        return;
+      }
 
       let amount = prompt("Enter amount to fund ₦:", "1000");
-      if (!amount || isNaN(amount) || amount < 100) {
+      if (!amount || isNaN(amount) || Number(amount) < 100) {
         alert("Minimum funding amount is ₦100");
         return;
       }
@@ -209,7 +223,7 @@
       let handler = PaystackPop.setup({
         key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         email: userEmail,
-        amount: amount * 100,
+        amount: Number(amount) * 100,
         currency: 'NGN',
         ref: 'CPY-FUND-' + Date.now() + '-' + userId.slice(-4),
         metadata: { user_id: userId },
@@ -238,16 +252,13 @@
           },
           body: JSON.stringify({ reference })
         });
-        
+
         const data = await res.json();
-        
+
         if(data.success) {
-          // ✅ FIX #3: Update localStorage AND screen immediately
-          window.currentUser.balance = data.newBalance;
-          localStorage.setItem('user', JSON.stringify(window.currentUser));
-          document.getElementById('user-balance').textContent = `₦${data.newBalance.toFixed(2)}`;
-          
-          alert(`Success! ₦${data.amount} added. New balance: ₦${data.newBalance.toFixed(2)}`);
+          // ✅ FIX: Re-fetch from server instead of trusting response
+          await loadUserData();
+          alert(`Success! ₦${data.amount} added. Your balance has been updated.`);
         } else {
           alert('Verification failed: ' + data.message);
         }
