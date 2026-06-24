@@ -259,8 +259,14 @@ app.get('/api/user', authMiddleware, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
+    // ✅ FIX: Fetch wallet and inject balance into response
+    const wallet = await Wallet.findOne({ userId: req.user.id });
+
     const userData = await formatUserResponse(user);
-    userData.id = user._id; // ✅ FIX #6: Already had this - keeping it
+    userData.id = user._id;
+    userData.balance = wallet?.balance || 0; // ← THIS WAS MISSING
+    userData.walletId = wallet?.walletId || null;
+
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error('❌ User Fetch Error:', error);
