@@ -113,19 +113,57 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
   <script src="https://js.paystack.co/v1/inline.js"></script>
 
   <script>
+    const API_URL = ''; // Same domain
+    const TOKEN_KEY = 'creativepay_token';
+
+    // =========================
+    // 1. AUTH + FETCH FRESH DATA ON EVERY LOAD
+    // =========================
+    document.addEventListener('DOMContentLoaded', async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return window.location.href = '/';
+
+      try {
+        // ✅ FIX #1: Always fetch fresh data from server, never trust cache
+        const res = await fetch(`${API_URL}/api/user`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) throw new Error('Session expired');
+        
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+
+        window.currentUser = data.user;
+        localStorage.setItem('user', JSON.stringify(data.user)); // Update cache
+        updateDashboard(data.user);
+        
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('dashboardContent').style.display = 'block';
+        
+        document.getElementById('output-window').textContent = 
+          `✅ Connected to CreativePay\nUser: ${data.user.email}\nBalance: ₦${data.user.balance.toFixed(2)}`;
+
+      } catch (error) {
+        console.error('Load Error:', error);
+        document.getElementById('loadingState').textContent = 'Session expired. Please login again.';
+        setTimeout(() => logout(), 2000);
+      }
+    });
+
     function logout() {
-      localStorage.removeItem('creativepay_token');
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem('user');
       window.location.href = '/';
     }
 
-    // FIXED: Reads user.balance, not user.wallet.balance
+    // =========================
+    // 2. UPDATE UI WITH FRESH DATA
+    // =========================
     function updateDashboard(userData) {
-      window.currentUser = userData; // Store globally
-      
       document.getElementById('user-email').textContent = userData.email || 'N/A';
       document.getElementById('user-name').textContent = userData.fullName || 'CreativePay User';
 
@@ -139,15 +177,18 @@
         kycBadge.className = 'kyc-badge';
       }
 
-      // FIXED: Backend sends balance directly, not nested
+      // ✅ FIX #2: Balance is direct from backend, not nested
       document.getElementById('user-balance').textContent = `₦${(userData.balance || 0).toFixed(2)}`;
       document.getElementById('wallet-id').textContent = userData.walletId 
         ? `Wallet ID: ${userData.walletId}` 
         : 'Wallet ID: Pending KYC';
     }
 
+    // =========================
+    // 3. FUND WALLET - COMPLETE FLOW
+    // =========================
     function fundWallet() {
-      if (!window.currentUser || !window.currentUser.email) {
+      if (!window.currentUser?.id) {
         alert('Please wait, loading your account...');
         return;
       }
@@ -158,18 +199,19 @@
         return;
       }
 
-      const userEmail = window.currentUser.email;
-      const userId = window.currentUser.id || window.currentUser._id || 'guest';
       const fundBtn = document.getElementById('fundWalletBtn');
       fundBtn.disabled = true;
       fundBtn.innerText = 'Opening Paystack...';
+
+      const userId = window.currentUser.id;
+      const userEmail = window.currentUser.email;
 
       let handler = PaystackPop.setup({
         key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         email: userEmail,
         amount: amount * 100,
         currency: 'NGN',
-        ref: 'CP_' + Date.now() + '_' + userId,
+        ref: 'CPY-FUND-' + Date.now() + '-' + userId.slice(-4),
         metadata: { user_id: userId },
         onClose: function(){
           alert('Payment cancelled');
@@ -177,64 +219,46 @@
           fundBtn.innerText = '+ Fund Wallet';
         },
         callback: function(response){
-          verifyPaymentOnServer(response.reference, amount, userId);
+          verifyPaymentOnServer(response.reference);
         }
       });
       handler.openIframe();
     }
 
-    function verifyPaymentOnServer(reference, amount, userId) {
+    async function verifyPaymentOnServer(reference) {
       const fundBtn = document.getElementById('fundWalletBtn');
       fundBtn.innerText = 'Verifying Payment...';
 
-      fetch('/api/fund-wallet/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + localStorage.getItem('creativepay_token')
-        },
-        body: JSON.stringify({ reference: reference })
-      })
-      .then(res => res.json())
-      .then(data => {
+      try {
+        const res = await fetch(`${API_URL}/api/fund-wallet/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem(TOKEN_KEY)
+          },
+          body: JSON.stringify({ reference })
+        });
+        
+        const data = await res.json();
+        
         if(data.success) {
-          alert(`Success! ₦${data.amount} added to your wallet`);
-          // FIXED: Update UI directly instead of full reload
-          document.getElementById('user-balance').textContent = `₦${data.newBalance.toFixed(2)}`;
+          // ✅ FIX #3: Update localStorage AND screen immediately
           window.currentUser.balance = data.newBalance;
-          fundBtn.disabled = false;
-          fundBtn.innerText = '+ Fund Wallet';
+          localStorage.setItem('user', JSON.stringify(window.currentUser));
+          document.getElementById('user-balance').textContent = `₦${data.newBalance.toFixed(2)}`;
+          
+          alert(`Success! ₦${data.amount} added. New balance: ₦${data.newBalance.toFixed(2)}`);
         } else {
           alert('Verification failed: ' + data.message);
-          fundBtn.disabled = false;
-          fundBtn.innerText = '+ Fund Wallet';
         }
-      })
-      .catch(err => {
+      } catch (err) {
+        console.error('Verify Error:', err);
         alert('Error verifying payment. Contact support with ref: ' + reference);
+      } finally {
         fundBtn.disabled = false;
         fundBtn.innerText = '+ Fund Wallet';
-      });
+      }
     }
-
-    // app.js will call fetchUserProfile() - we hook into it
-    document.addEventListener('DOMContentLoaded', () => {
-      const checkUser = setInterval(() => {
-        if (window.currentUser) {
-          clearInterval(checkUser);
-          updateDashboard(window.currentUser);
-          document.getElementById('loadingState').style.display = 'none';
-          document.getElementById('dashboardContent').style.display = 'block';
-        }
-      }, 100);
-
-      setTimeout(() => {
-        clearInterval(checkUser);
-        if (!window.currentUser) {
-          document.getElementById('loadingState').textContent = 'Failed to load account. Please login again.';
-        }
-      }, 5000);
-    });
   </script>
 </body>
 </html>
