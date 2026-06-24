@@ -250,8 +250,9 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    
+
     const userData = await formatUserResponse(user);
+    userData.id = user._id; // <- NEW LINE ADDED HERE
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error('❌ User Fetch Error:', error);
