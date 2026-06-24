@@ -68,12 +68,10 @@
     <div id="loadingState" class="loading">Loading your account...</div>
 
     <div id="dashboardContent" style="display: none;">
-      <!-- KYC Tier 1 Banner -->
       <div class="kyc-banner" id="kyc-banner">
         ✅ KYC TIER 1 VERIFIED - Welcome to CreativePay!
       </div>
 
-      <!-- User Info Card -->
       <div class="card">
         <div class="user-info">
           <span class="label">Account Email</span>
@@ -89,18 +87,15 @@
         </div>
       </div>
 
-      <!-- Wallet Balance Card -->
       <div class="card balance-card">
         <div class="balance-label">Available Balance</div>
         <div class="balance-amount" id="user-balance">₦0.00</div>
         <div class="wallet-id" id="wallet-id">Wallet ID: Generating...</div>
       </div>
 
-      <!-- Quick Actions Card -->
       <div class="card">
         <h3 style="margin-bottom: 16px;">Quick Actions</h3>
         <div style="display: grid; gap: 12px;">
-          <!-- PAYSTACK FUND WALLET BUTTON - ALREADY HERE -->
           <button onclick="fundWallet()" id="fundWalletBtn" class="fund-btn">
             + Fund Wallet
           </button>
@@ -111,7 +106,6 @@
         </div>
       </div>
 
-      <!-- Analytics Card -->
       <div class="card">
         <h3 style="margin-bottom: 16px;">Live Metrics</h3>
         <pre id="output-window">Connecting to CreativePay servers...</pre>
@@ -119,10 +113,7 @@
     </div>
   </div>
 
-  <!-- CRITICAL: Load app.js - This runs fetchUserProfile() + KYC gate -->
   <script src="/app.js"></script>
-  
-  <!-- PAYSTACK INLINE SCRIPT - ALREADY HERE -->
   <script src="https://js.paystack.co/v1/inline.js"></script>
 
   <script>
@@ -131,14 +122,15 @@
       window.location.href = '/';
     }
 
-    // Update dashboard with user + wallet data
+    // FIXED: Reads user.balance, not user.wallet.balance
     function updateDashboard(userData) {
+      window.currentUser = userData; // Store globally
+      
       document.getElementById('user-email').textContent = userData.email || 'N/A';
       document.getElementById('user-name').textContent = userData.fullName || 'CreativePay User';
 
-      // KYC Badge
       const kycBadge = document.getElementById('kyc-badge');
-      if (userData.kycTier === 1) {
+      if (userData.kycTier >= 1) {
         kycBadge.textContent = 'KYC TIER 1 VERIFIED';
         kycBadge.className = 'kyc-badge kyc-verified';
         document.getElementById('kyc-banner').style.display = 'block';
@@ -147,17 +139,13 @@
         kycBadge.className = 'kyc-badge';
       }
 
-      // Wallet Data
-      if (userData.wallet) {
-        document.getElementById('user-balance').textContent = `₦${userData.wallet.balance.toFixed(2)}`;
-        document.getElementById('wallet-id').textContent = `Wallet ID: ${userData.wallet.walletId}`;
-      } else {
-        document.getElementById('user-balance').textContent = '₦0.00';
-        document.getElementById('wallet-id').textContent = 'Wallet ID: Pending KYC';
-      }
+      // FIXED: Backend sends balance directly, not nested
+      document.getElementById('user-balance').textContent = `₦${(userData.balance || 0).toFixed(2)}`;
+      document.getElementById('wallet-id').textContent = userData.walletId 
+        ? `Wallet ID: ${userData.walletId}` 
+        : 'Wallet ID: Pending KYC';
     }
 
-    // PAYSTACK FUND WALLET FUNCTION - ALREADY HERE
     function fundWallet() {
       if (!window.currentUser || !window.currentUser.email) {
         alert('Please wait, loading your account...');
@@ -165,14 +153,13 @@
       }
 
       let amount = prompt("Enter amount to fund ₦:", "1000");
-      
       if (!amount || isNaN(amount) || amount < 100) {
         alert("Minimum funding amount is ₦100");
         return;
       }
 
       const userEmail = window.currentUser.email;
-      const userId = window.currentUser.id || 'guest';
+      const userId = window.currentUser.id || window.currentUser._id || 'guest';
       const fundBtn = document.getElementById('fundWalletBtn');
       fundBtn.disabled = true;
       fundBtn.innerText = 'Opening Paystack...';
@@ -199,24 +186,24 @@
     function verifyPaymentOnServer(reference, amount, userId) {
       const fundBtn = document.getElementById('fundWalletBtn');
       fundBtn.innerText = 'Verifying Payment...';
-      
+
       fetch('/api/fund-wallet/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + localStorage.getItem('creativepay_token')
         },
-        body: JSON.stringify({ 
-          reference: reference, 
-          amount: parseFloat(amount),
-          user_id: userId 
-        })
+        body: JSON.stringify({ reference: reference })
       })
       .then(res => res.json())
       .then(data => {
         if(data.success) {
-          alert(`Success! ₦${amount} added to your wallet`);
-          location.reload();
+          alert(`Success! ₦${data.amount} added to your wallet`);
+          // FIXED: Update UI directly instead of full reload
+          document.getElementById('user-balance').textContent = `₦${data.newBalance.toFixed(2)}`;
+          window.currentUser.balance = data.newBalance;
+          fundBtn.disabled = false;
+          fundBtn.innerText = '+ Fund Wallet';
         } else {
           alert('Verification failed: ' + data.message);
           fundBtn.disabled = false;
@@ -243,9 +230,10 @@
 
       setTimeout(() => {
         clearInterval(checkUser);
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('dashboardContent').style.display = 'block';
-      }, 3000);
+        if (!window.currentUser) {
+          document.getElementById('loadingState').textContent = 'Failed to load account. Please login again.';
+        }
+      }, 5000);
     });
   </script>
 </body>
