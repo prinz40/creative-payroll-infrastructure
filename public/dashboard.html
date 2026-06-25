@@ -131,28 +131,27 @@
       if (!token) return window.location.href = '/';
 
       try {
-        // Always fetch fresh data from server, never trust cache
         const res = await fetch(`${API_URL}/api/user`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (res.status === 401) {
-          throw new Error('Session expired');
-        }
+        if (res.status === 401) throw new Error('Session expired');
         if (!res.ok) throw new Error('Server error');
 
         const data = await res.json();
-        if (!data.success) throw new Error(data.message);
 
-        window.currentUser = data.user;
-        localStorage.setItem('user', JSON.stringify(data.user));
-        updateDashboard(data.user);
+        // Fix: Gracefully handle both flat objects and nested data formats
+        const userData = data.user ? data.user : data;
+
+        window.currentUser = userData;
+        localStorage.setItem('user', JSON.stringify(userData));
+        updateDashboard(userData);
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('dashboardContent').style.display = 'block';
 
         document.getElementById('output-window').textContent = 
-          `✅ Connected to CreativePay\nUser: ${data.user.email}\nBalance: ₦${Number(data.user.balance || 0).toFixed(2)}\nWallet: ${data.user.walletId || 'Pending'}`;
+          `✅ Connected to CreativePay\nUser: ${userData.email}\nBalance: ₦${Number(userData.balance || 0).toFixed(2)}\nWallet: ${userData.walletId || 'Pending'}`;
 
       } catch (error) {
         console.error('Load Error:', error);
