@@ -17,7 +17,7 @@ app.set('trust proxy', 1);
 const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
 for (const env of requiredEnvs) {
   if (!process.env[env]) {
-    console.error(`❌ FATAL: ${env} missing in .env`);
+    console.error(`❌ FATAL: ${env} missing in.env`);
     process.exit(1);
   }
 }
@@ -112,46 +112,48 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // =========================
-// 6. HELPER: BUILD USER RESPONSE - BULLETPROOF FINAL REMIX
+// 6. HELPER: BUILD USER RESPONSE - BULLETPROOF
 // =========================
 const buildUserResponse = async (user) => {
   try {
-    // FIX: String matching fallback approach guarantees successful search lookup across native contexts
-    const targetUserId = user._id ? user._id.toString() : user.id;
-    
-    console.log(`🔍 Querying wallet for sanitized userId reference string: ${targetUserId}`);
-    let wallet = await Wallet.findOne({ userId: targetUserId });
+    const userObjectId = new mongoose.Types.ObjectId(user._id);
+    let wallet = await Wallet.findOne({ userId: userObjectId });
 
     if (wallet && (!wallet.walletId || wallet.walletId === '')) {
-      console.log('🔧 Dynamic configuration update applied to patch legacy index values');
-      wallet.walletId = `CPY-${Date.now()}-${targetUserId.slice(-4)}`;
+      wallet.walletId = `CPY-${Date.now()}-${user._id.toString().slice(-4)}`;
       await wallet.save();
     }
 
+    if (wallet) wallet = wallet.toObject();
+
     let safeBalance = 0;
-    if (wallet && wallet.balance !== undefined && wallet.balance !== null) {
-      safeBalance = parseFloat(wallet.balance.toString());
+    if (wallet?.balance!= null) {
+      if (typeof wallet.balance === 'object' && wallet.balance.toString) {
+        safeBalance = parseFloat(wallet.balance.toString());
+      } else {
+        safeBalance = parseFloat(wallet.balance);
+      }
       if (isNaN(safeBalance)) safeBalance = 0;
     }
 
     return {
-      id: targetUserId,
+      id: user._id,
       email: user.email,
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
       balance: safeBalance,
-      walletId: wallet ? wallet.walletId : null,
+      walletId: wallet?.walletId || null,
       createdAt: user.createdAt
     };
   } catch (error) {
-    console.error('❌ buildUserResponse Error Context Recovery operational:', error);
+    console.error('❌ buildUserResponse Error:', error);
     return {
-      id: user._id ? user._id.toString() : null,
+      id: user._id,
       email: user.email,
       fullName: user.fullName,
-      kycTier: user.kycTier || 0,
-      kycStatus: user.kycStatus || 'unverified',
+      kycTier: user.kycTier,
+      kycStatus: user.kycStatus,
       balance: 0,
       walletId: null,
       createdAt: user.createdAt
@@ -167,7 +169,7 @@ const buildUserResponse = async (user) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
-    if (!email || !password) {
+    if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
     if (password.length < 6) {
@@ -188,10 +190,9 @@ app.post('/api/register', async (req, res) => {
       kycStatus: 'unverified'
     });
 
-    const token = jwt.sign({ id: user._id.toString(), email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const userData = await buildUserResponse(user);
 
-    console.log('✅ User registered:', user.email);
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -208,19 +209,18 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password required' });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user ||!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign({ id: user._id.toString(), email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const userData = await buildUserResponse(user);
 
-    console.log('✅ User logged in:', user.email, 'Balance:', userData.balance);
     res.json({
       success: true,
       message: 'Login successful',
@@ -238,7 +238,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const { bvn } = req.body;
-    if (!bvn || bvn.length !== 11 || !/^\d+$/.test(bvn)) {
+    if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
 
@@ -268,7 +268,6 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
     const user = await User.findById(userObjectId);
     const userData = await buildUserResponse(user);
 
-    console.log('✅ BVN Verified for:', user.email);
     res.json({
       success: true,
       message: 'BVN verified successfully',
@@ -285,15 +284,13 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
 // GET CURRENT USER
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
-    console.log('🔍 /api/user called for userId:', req.user.id);
-    const user = await User.findById(req.user.id).select('-password').lean();
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const user = await User.findById(userObjectId).select('-password').lean();
     if (!user) {
-      console.log('❌ User not found in DB');
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     const userData = await buildUserResponse(user);
-    console.log('✅ Final userData sent:', JSON.stringify(userData));
     res.json({ success: true, user: userData });
   } catch (error) {
     console.error('❌ User Fetch Error:', error);
@@ -303,8 +300,9 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 
 // WALLET BALANCE
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
-
-  try {const wallet = await Wallet.findOne({ userId: req.user.id }).lean();
+  try {
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
     if (!wallet) {
       return res.status(404).json({ success: false, message: 'Wallet not found. Complete KYC first.' });
     }
@@ -325,27 +323,25 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const { reference } = req.body;
-    const currentUserId = req.user.id;
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     if (!reference) {
       return res.status(400).json({ success: false, message: 'Transaction reference required' });
     }
 
-    console.log(`🔍 Verifying payment: ${reference} for user: ${req.user.email}`);
-
     const existingTxn = await Transaction.findOne({ reference });
-    if (existingTxn && existingTxn.status === 'success') {
-      const wallet = await Wallet.findOne({ userId: currentUserId }).lean();
+    if (existingTxn?.status === 'success') {
+      const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
       return res.json({
         success: true,
         message: 'Transaction already verified',
-        newBalance: wallet ? wallet.balance : 0,
+        newBalance: wallet?.balance || 0,
         amount: existingTxn.amount / 100
       });
     }
 
     const paystackRes = await axios.get(
-      `https://paystack.co{reference}`,
+      `https://api.paystack.co/transaction/verify/${reference}`,
       {
         headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
         timeout: 10000
@@ -353,25 +349,25 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
     );
 
     const { status, amount, currency } = paystackRes.data.data;
-    if (status !== 'success' || currency !== 'NGN') {
-      await Transaction.create({ userId: currentUserId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
+    if (status!== 'success' || currency!== 'NGN') {
+      await Transaction.create({ userId: userObjectId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
 
     const amountNaira = amount / 100;
-    let updatedWallet;
+    let wallet;
 
     await session.withTransaction(async () => {
-      updatedWallet = await Wallet.findOneAndUpdate(
-        { userId: currentUserId },
+      wallet = await Wallet.findOneAndUpdate(
+        { userId: userObjectId },
         { $inc: { balance: amountNaira } },
         { new: true, upsert: true, session }
-      );
+      ).lean();
 
       await Transaction.findOneAndUpdate(
         { reference },
         {
-          userId: currentUserId,
+          userId: userObjectId,
           reference,
           amount,
           status: 'success',
@@ -383,12 +379,10 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
       );
     });
 
-    console.log(`✅ Wallet credited: ₦${amountNaira} for ${req.user.email}. New balance: ₦${updatedWallet.balance}`);
-
     res.json({
       success: true,
       message: 'Wallet funded successfully!',
-      newBalance: updatedWallet.balance,
+      newBalance: wallet.balance,
       amount: amountNaira,
       reference
     });
@@ -402,19 +396,20 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 });
 
 // =========================
-// 8. STATIC FILES
+// 8. STATIC FILES - FIXED
 // =========================
 app.use(express.static(path.join(__dirname, 'public')));
 
 // =========================
-// 9. ROUTES
+// 9. ROUTES - FIXED: Serve files, don't redirect
 // =========================
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ✅ FIX: This was redirecting everything to / and breaking dashboard.html
 app.get('*', (req, res) => {
-  res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // =========================
@@ -430,8 +425,8 @@ app.use((err, req, res, next) => {
 // =========================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`✅ JWT Secret: ${process.env.JWT_SECRET ? 'Loaded' : 'MISSING'}`);
-  console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY ? 'Loaded' : 'MISSING'}`);
-  console.log(`✅ MongoDB: ${process.env.MONGODB_URI ? 'Connected' : 'MISSING'}`);
+  console.log(`✅ JWT Secret: ${process.env.JWT_SECRET? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ MongoDB: ${process.env.MONGODB_URI? 'Connected' : 'MISSING'}`);
   console.log(`🚀 CreativePay Phase 3 server running on port ${PORT}`);
 });
