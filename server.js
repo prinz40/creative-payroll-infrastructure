@@ -79,13 +79,18 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema);
 const Wallet = require('./models/Wallet');
 
+// PHASE 4: UPGRADED TRANSACTION SCHEMA - Cross-border ready
 const transactionSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }, // For funding/withdraw
+  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }, // For transfers
+  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }, // For transfers
   reference: { type: String, required: true, unique: true, index: true },
   amount: { type: Number, required: true },
   status: { type: String, enum: ['success', 'failed', 'pending'], default: 'pending', index: true },
-  type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
+  type: { type: String, enum: ['credit', 'debit', 'transfer', 'withdraw'], required: true },
+  currency: { type: String, default: 'NGN', enum: ['NGN', 'USD', 'GHS', 'KES'] }, // Africa expansion
   channel: { type: String, default: 'paystack' },
+  description: { type: String },
   metadata: { type: Object }
 }, { timestamps: true });
 
@@ -350,7 +355,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 
     const { status, amount, currency } = paystackRes.data.data;
     if (status!== 'success' || currency!== 'NGN') {
-      await Transaction.create({ userId: userObjectId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
+      await Transaction.create({ userId: userObjectId, reference, amount: amount || 0, status: 'failed', type: 'credit', currency: 'NGN' });
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
 
@@ -372,6 +377,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
           amount,
           status: 'success',
           type: 'credit',
+          currency: 'NGN',
           channel: 'paystack',
           metadata: paystackRes.data.data
         },
@@ -392,6 +398,111 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: 'Payment verification failed' });
   } finally {
     await session.endSession();
+  }
+});
+
+// =========================
+// PHASE 4A: SEND MONEY - P2P TRANSFERS
+// =========================
+app.post('/api/transfer', authMiddleware, async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
+  try {
+    const { recipient, amount, description } = req.body;
+    const senderId = new mongoose.Types.ObjectId(req.user.id);
+    
+    if (!recipient ||!amount || Number(amount) < 10) {
+      throw new Error('Recipient and minimum ₦10 required');
+    }
+    
+    const transferAmount = Number(amount);
+    
+    // Find sender
+    const sender = await User.findById(senderId).session(session);
+    const senderWallet = await Wallet.findOne({ userId: senderId }).session(session);
+    
+    if (!sender) throw new Error('Sender not found');
+    if (!senderWallet) throw new Error('Sender wallet not found. Complete KYC first');
+    if (senderWallet.balance < transferAmount) throw new Error('Insufficient balance');
+    if (sender.kycTier < 1) throw new Error('Complete BVN verification to send money');
+    
+    // Find receiver by walletId or email - supports cross-border
+    let receiver;
+    if (recipient.startsWith('CPY-')) {
+      const receiverWallet = await Wallet.findOne({ walletId: recipient }).session(session);
+      if (!receiverWallet) throw new Error('Recipient wallet not found');
+      receiver = await User.findById(receiverWallet.userId).session(session);
+    } else {
+      receiver = await User.findOne({ email: recipient.toLowerCase() }).session(session);
+    }
+    
+    if (!receiver) throw new Error('Recipient not found');
+    if (receiver._id.equals(sender._id)) throw new Error('Cannot send to yourself');
+    
+    const receiverWallet = await Wallet.findOne({ userId: receiver._id }).session(session);
+    if (!receiverWallet) throw new Error('Recipient has not completed KYC');
+    
+    // Update balances - atomic
+    senderWallet.balance -= transferAmount;
+    receiverWallet.balance += transferAmount;
+    
+    await senderWallet.save({ session });
+    await receiverWallet.save({ session });
+    
+    // Create transaction record - cross-border ready
+    const txRef = 'CPY-TRF-' + Date.now() + '-' + sender._id.toString().slice(-4);
+    await Transaction.create([{
+      reference: txRef,
+      senderId: sender._id,
+      receiverId: receiver._id,
+      amount: transferAmount,
+      type: 'transfer',
+      currency: 'NGN', // Future: detect currency from wallet
+      status: 'success',
+      description: description || `Transfer to ${receiver.email}`
+    }], { session });
+    
+    await session.commitTransaction();
+    
+    res.json({ 
+      success: true, 
+      message: `₦${transferAmount} sent successfully to ${receiver.email}`,
+      newBalance: senderWallet.balance,
+      reference: txRef
+    });
+    
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('❌ Transfer Error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
+  }
+});
+
+// =========================
+// PHASE 4A: TRANSACTION HISTORY
+// =========================
+app.get('/api/transactions', authMiddleware, async (req, res) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const transactions = await Transaction.find({
+      $or: [
+        { senderId: userId }, 
+        { receiverId: userId },
+        { userId: userId } // For funding
+      ]
+    })
+   .populate('senderId', 'email walletId fullName')
+   .populate('receiverId', 'email walletId fullName')
+   .sort({ createdAt: -1 })
+   .limit(50);
+    
+    res.json({ success: true, transactions });
+  } catch (error) {
+    console.error('❌ Transactions Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch transactions' });
   }
 });
 
@@ -428,5 +539,5 @@ app.listen(PORT, () => {
   console.log(`✅ JWT Secret: ${process.env.JWT_SECRET? 'Loaded' : 'MISSING'}`);
   console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY? 'Loaded' : 'MISSING'}`);
   console.log(`✅ MongoDB: ${process.env.MONGODB_URI? 'Connected' : 'MISSING'}`);
-  console.log(`🚀 CreativePay Phase 3 server running on port ${PORT}`);
+  console.log(`🚀 CreativePay Phase 4A server running on port ${PORT}`);
 });
