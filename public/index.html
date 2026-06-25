@@ -109,7 +109,7 @@
       animation: spin 1s linear infinite; 
       margin: 0 auto 20px; 
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }
 
     /* DASHBOARD STYLES */
     .header {
@@ -151,6 +151,10 @@
     .send-btn:hover { background: #15803d; }
     .history-btn { background: #475569; }
     .history-btn:hover { background: #334155; }
+    .back-btn {
+      width: auto; padding: 6px 12px; font-size: 12px; background: #475569; margin: 0;
+    }
+    .back-btn:hover { background: #334155; }
     #output-window {
       background: #0f172a; padding: 16px; border-radius: 8px;
       font-family: monospace; font-size: 12px; overflow-x: auto;
@@ -173,6 +177,9 @@
     .tx-credit { color: #4ade80; }
     .tx-debit { color: #f87171; }
     .tx-date { color: #64748b; font-size: 12px; }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -270,7 +277,10 @@
     </div>
 
     <div class="card" id="transactionsCard" style="display: none;">
-      <h3>Transaction History</h3>
+      <div class="card-header">
+        <h3>Transaction History</h3>
+        <button onclick="closeHistory()" class="back-btn">← Back</button>
+      </div>
       <div id="transactionsList"></div>
     </div>
 
@@ -361,6 +371,12 @@
       document.getElementById('registerForm').classList.add('hidden');
       document.getElementById('bvnForm').classList.remove('hidden');
     };
+
+    // UX FIX: Return to dashboard from History
+    function closeHistory() {
+      document.getElementById('transactionsCard').style.display = 'none';
+      loadDashboard();
+    }
 
     // =========================
     // 3. API CALLS WITH TIMEOUT
@@ -608,10 +624,10 @@
           body: JSON.stringify({ reference })
         });
 
-        alert(`Success! ₦${data.amount} added. New balance: ₦${data.newBalance.toFixed(2)}`);
-        await loadDashboard();
+        alert(`✅ Wallet funded successfully!\nNew balance: ₦${data.newBalance.toFixed(2)}`);
+        loadDashboard();
       } catch (error) {
-        alert('Verification failed: ' + error.message);
+        alert('Payment verification failed: ' + error.message);
       } finally {
         fundBtn.disabled = false;
         fundBtn.textContent = '+ Fund Wallet';
@@ -619,23 +635,23 @@
     }
 
     // =========================
-    // 7. PHASE 4A: SEND MONEY
+    // 7. SEND MONEY - PHASE 4A
     // =========================
     function openSendModal() {
-      if (!currentUser || currentUser.kycTier < 1) {
+      if (currentUser.kycTier < 1) {
         alert('Complete BVN verification to send money');
         return;
       }
       document.getElementById('sendModal').classList.remove('hidden');
       document.getElementById('sendError').classList.add('hidden');
       document.getElementById('sendSuccess').classList.add('hidden');
+      document.getElementById('sendRecipient').value = '';
+      document.getElementById('sendAmount').value = '';
+      document.getElementById('sendDesc').value = '';
     }
 
     function closeSendModal() {
       document.getElementById('sendModal').classList.add('hidden');
-      document.getElementById('sendRecipient').value = '';
-      document.getElementById('sendAmount').value = '';
-      document.getElementById('sendDesc').value = '';
     }
 
     async function handleTransfer() {
@@ -644,8 +660,16 @@
       const description = document.getElementById('sendDesc').value.trim();
       const btn = document.getElementById('sendBtn');
 
-      if (!recipient || !amount || Number(amount) < 10) {
-        showError('sendError', 'Enter recipient and minimum ₦10');
+      if (!recipient || !amount) {
+        showError('sendError', 'Recipient and amount required');
+        return;
+      }
+      if (Number(amount) < 10) {
+        showError('sendError', 'Minimum transfer is ₦10');
+        return;
+      }
+      if (Number(amount) > currentUser.balance) {
+        showError('sendError', 'Insufficient balance');
         return;
       }
 
@@ -655,7 +679,7 @@
       try {
         const data = await apiCall('/api/transfer', {
           method: 'POST',
-          body: JSON.stringify({ recipient, amount, description })
+          body: JSON.stringify({ recipient, amount: Number(amount), description })
         });
 
         showSuccess('sendSuccess', data.message);
@@ -665,98 +689,56 @@
         }, 2000);
       } catch (error) {
         showError('sendError', error.message);
-      } finally {
         btn.disabled = false;
         btn.textContent = 'Send Money';
       }
     }
 
     // =========================
-    // 8. PHASE 4A: TRANSACTION HISTORY
+    // 8. TRANSACTIONS
     // =========================
     async function loadTransactions() {
-      const card = document.getElementById('transactionsCard');
-      const list = document.getElementById('transactionsList');
-      
-      card.style.display = 'block';
-      list.innerHTML = '<p style="text-align:center;color:#64748b;">Loading...</p>';
-
       try {
         const data = await apiCall('/api/transactions');
+        const list = document.getElementById('transactionsList');
         
-        if (!data.transactions || data.transactions.length === 0) {
+        if (data.transactions.length === 0) {
           list.innerHTML = '<p style="text-align:center;color:#64748b;">No transactions yet</p>';
-          return;
-        }
-
-        list.innerHTML = data.transactions.map(tx => {
-          const isCredit = tx.receiverId?._id === currentUser.id || tx.type === 'credit';
-          const amountClass = isCredit ? 'tx-credit' : 'tx-debit';
-          const sign = isCredit ? '+' : '-';
-          const otherParty = isCredit 
-            ? (tx.senderId?.email || tx.senderId?.walletId || 'System')
-            : (tx.receiverId?.email || tx.receiverId?.walletId || 'System');
-          const desc = tx.description || (isCredit ? `From ${otherParty}` : `To ${otherParty}`);
-          const date = new Date(tx.createdAt).toLocaleString('en-NG', {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-          });
-
-          return `
+        } else {
+          list.innerHTML = data.transactions.map(tx => `
             <div class="tx-row">
               <div>
-                <div style="font-weight:600;">${desc}</div>
-                <div class="tx-date">${date} • ${tx.reference}</div>
+                <div>${tx.description || tx.type}</div>
+                <div class="tx-date">${new Date(tx.createdAt).toLocaleString()}</div>
               </div>
-              <div class="${amountClass}" style="font-weight:700;">
-                ${sign}₦${Number(tx.amount).toFixed(2)}
+              <div class="${tx.amount > 0 ? 'tx-credit' : 'tx-debit'}">
+                ${tx.amount > 0 ? '+' : ''}₦${Math.abs(tx.amount).toFixed(2)}
               </div>
             </div>
-          `;
-        }).join('');
-      } catch (error) {
-        list.innerHTML = `<p style="text-align:center;color:#dc2626;">Error: ${error.message}</p>`;
-      }
-    }
-
-    // =========================
-    // 9. AUTO-LOGIN ON PAGE LOAD
-    // =========================
-    async function init() {
-      showLoader();
-
-      authCheckTimeout = setTimeout(() => {
-        document.querySelector('#loader p').textContent = 'Still loading... Check your connection';
-      }, 15000);
-
-      const token = getToken();
-      if (!token) {
-        clearTimeout(authCheckTimeout);
-        showAuth();
-        showLogin();
-        return;
-      }
-
-      try {
-        const data = await apiCall('/api/user');
-        clearTimeout(authCheckTimeout);
-
-        if (data.user.kycTier === 0) {
-          showAuth();
-          showBVN();
-        } else {
-          await loadDashboard(data.user);
+          `).join('');
         }
+        
+        document.getElementById('transactionsCard').style.display = 'block';
       } catch (error) {
-        clearTimeout(authCheckTimeout);
-        console.error('Auto-login failed:', error);
-        clearToken();
-        showAuth();
-        showLogin();
+        showError('sendError', 'Failed to load transactions');
       }
     }
 
-    // Start app
-    init();
+    // =========================
+    // 9. INIT
+    // =========================
+    window.addEventListener('DOMContentLoaded', async () => {
+      const token = getToken();
+      if (token) {
+        await loadDashboard();
+      } else {
+        showLoader();
+        setTimeout(() => {
+          showAuth();
+          showLogin();
+        }, 1000);
+      }
+    });
   </script>
 </body>
 </html>
