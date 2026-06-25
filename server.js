@@ -32,7 +32,6 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting - 100 requests per 15 mins per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -42,7 +41,6 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Strict rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -84,7 +82,7 @@ const Wallet = require('./models/Wallet');
 const transactionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   reference: { type: String, required: true, unique: true, index: true },
-  amount: { type: Number, required: true }, // in kobo
+  amount: { type: Number, required: true },
   status: { type: String, enum: ['success', 'failed', 'pending'], default: 'pending', index: true },
   type: { type: String, enum: ['credit', 'debit'], default: 'credit' },
   channel: { type: String, default: 'paystack' },
@@ -114,15 +112,21 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // =========================
-// 6. HELPER: BUILD USER RESPONSE - FIXED VERSION
+// 6. HELPER: BUILD USER RESPONSE - FINAL FIX
 // =========================
 const buildUserResponse = async (user) => {
   try {
-    const wallet = await Wallet.findOne({ userId: user._id }).lean();
+    // ✅ FIX: Cast user._id to ObjectId to match Wallet schema
+    const userObjectId = new mongoose.Types.ObjectId(user._id);
 
-    console.log(`🔍 Building response for ${user.email}`);
-    console.log(`🔍 Wallet found:`, wallet? 'YES' : 'NO');
-    console.log(`🔍 Balance:`, wallet?.balance);
+    console.log('🔍 Building response for', user.email);
+    console.log('🔍 Searching wallet for userId:', userObjectId);
+
+    const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
+
+    console.log('🔍 Wallet found:', wallet? 'YES' : 'NO');
+    console.log('🔍 Balance:', wallet?.balance);
+    console.log('🔍 WalletId:', wallet?.walletId);
 
     return {
       id: user._id,
@@ -130,7 +134,7 @@ const buildUserResponse = async (user) => {
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
-      balance: wallet?.balance || 0,
+      balance: Number(wallet?.balance || 0),
       walletId: wallet?.walletId || null,
       createdAt: user.createdAt
     };
@@ -232,16 +236,18 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
 
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+
     await session.withTransaction(async () => {
       const user = await User.findByIdAndUpdate(
-        req.user.id,
+        userObjectId,
         { bvn, kycTier: 1, kycStatus: 'verified' },
         { new: true, session }
       );
       if (!user) throw new Error('User not found');
 
       await Wallet.findOneAndUpdate(
-        { userId: user._id },
+        { userId: userObjectId },
         {
           $setOnInsert: {
             walletId: `CPY-${Date.now()}-${user._id.toString().slice(-4)}`,
@@ -253,7 +259,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
       );
     });
 
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(userObjectId);
     const userData = await buildUserResponse(user);
 
     console.log('✅ BVN Verified for:', user.email);
@@ -270,19 +276,19 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   }
 });
 
-// GET CURRENT USER - BULLETPROOF VERSION
+// GET CURRENT USER
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
     console.log('🔍 /api/user called for userId:', req.user.id);
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
-    const user = await User.findById(req.user.id).select('-password').lean();
+    const user = await User.findById(userObjectId).select('-password').lean();
     if (!user) {
       console.log('❌ User not found in DB');
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
     const userData = await buildUserResponse(user);
-
     console.log('✅ Final userData sent:', JSON.stringify(userData));
     res.json({ success: true, user: userData });
   } catch (error) {
@@ -294,7 +300,8 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 // WALLET BALANCE
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   try {
-    const wallet = await Wallet.findOne({ userId: req.user.id }).lean();
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
     if (!wallet) {
       return res.status(404).json({ success: false, message: 'Wallet not found. Complete KYC first.' });
     }
@@ -310,12 +317,12 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   }
 });
 
-// FUND WALLET VERIFY - ATOMIC TRANSACTION
+// FUND WALLET VERIFY
 app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
   const session = await mongoose.startSession();
   try {
     const { reference } = req.body;
-    const userId = req.user.id;
+    const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     if (!reference) {
       return res.status(400).json({ success: false, message: 'Transaction reference required' });
@@ -325,7 +332,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 
     const existingTxn = await Transaction.findOne({ reference });
     if (existingTxn?.status === 'success') {
-      const wallet = await Wallet.findOne({ userId }).lean();
+      const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
       return res.json({
         success: true,
         message: 'Transaction already verified',
@@ -344,7 +351,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 
     const { status, amount, currency } = paystackRes.data.data;
     if (status!== 'success' || currency!== 'NGN') {
-      await Transaction.create({ userId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
+      await Transaction.create({ userId: userObjectId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
 
@@ -353,7 +360,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
 
     await session.withTransaction(async () => {
       wallet = await Wallet.findOneAndUpdate(
-        { userId },
+        { userId: userObjectId },
         { $inc: { balance: amountNaira } },
         { new: true, upsert: true, session }
       ).lean();
@@ -361,7 +368,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
       await Transaction.findOneAndUpdate(
         { reference },
         {
-          userId,
+          userId: userObjectId,
           reference,
           amount,
           status: 'success',
