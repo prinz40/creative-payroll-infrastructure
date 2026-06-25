@@ -303,4 +303,135 @@ app.get('/api/user', authMiddleware, async (req, res) => {
 
 // WALLET BALANCE
 app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
+
+  try {const wallet = await Wallet.findOne({ userId: req.user.id }).lean();
+    if (!wallet) {
+      return res.status(404).json({ success: false, message: 'Wallet not found. Complete KYC first.' });
+    }
+    res.json({
+      success: true,
+      balance: wallet.balance,
+      walletId: wallet.walletId,
+      currency: wallet.currency
+    });
+  } catch (error) {
+    console.error('❌ Balance Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch balance' });
+  }
+});
+
+// FUND WALLET VERIFY
+app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
+  const session = await mongoose.startSession();
   try {
+    const { reference } = req.body;
+    const currentUserId = req.user.id;
+
+    if (!reference) {
+      return res.status(400).json({ success: false, message: 'Transaction reference required' });
+    }
+
+    console.log(`🔍 Verifying payment: ${reference} for user: ${req.user.email}`);
+
+    const existingTxn = await Transaction.findOne({ reference });
+    if (existingTxn && existingTxn.status === 'success') {
+      const wallet = await Wallet.findOne({ userId: currentUserId }).lean();
+      return res.json({
+        success: true,
+        message: 'Transaction already verified',
+        newBalance: wallet ? wallet.balance : 0,
+        amount: existingTxn.amount / 100
+      });
+    }
+
+    const paystackRes = await axios.get(
+      `https://paystack.co{reference}`,
+      {
+        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+        timeout: 10000
+      }
+    );
+
+    const { status, amount, currency } = paystackRes.data.data;
+    if (status !== 'success' || currency !== 'NGN') {
+      await Transaction.create({ userId: currentUserId, reference, amount: amount || 0, status: 'failed', type: 'credit' });
+      return res.status(400).json({ success: false, message: 'Payment not successful' });
+    }
+
+    const amountNaira = amount / 100;
+    let updatedWallet;
+
+    await session.withTransaction(async () => {
+      updatedWallet = await Wallet.findOneAndUpdate(
+        { userId: currentUserId },
+        { $inc: { balance: amountNaira } },
+        { new: true, upsert: true, session }
+      );
+
+      await Transaction.findOneAndUpdate(
+        { reference },
+        {
+          userId: currentUserId,
+          reference,
+          amount,
+          status: 'success',
+          type: 'credit',
+          channel: 'paystack',
+          metadata: paystackRes.data.data
+        },
+        { upsert: true, new: true, session }
+      );
+    });
+
+    console.log(`✅ Wallet credited: ₦${amountNaira} for ${req.user.email}. New balance: ₦${updatedWallet.balance}`);
+
+    res.json({
+      success: true,
+      message: 'Wallet funded successfully!',
+      newBalance: updatedWallet.balance,
+      amount: amountNaira,
+      reference
+    });
+
+  } catch (error) {
+    console.error('❌ Verify Error:', error.response?.data || error.message);
+    res.status(500).json({ success: false, message: 'Payment verification failed' });
+  } finally {
+    await session.endSession();
+  }
+});
+
+// =========================
+// 8. STATIC FILES
+// =========================
+app.use(express.static(path.join(__dirname, 'public')));
+
+// =========================
+// 9. ROUTES
+// =========================
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('*', (req, res) => {
+  res.redirect('/');
+});
+
+// =========================
+// 10. ERROR HANDLER
+// =========================
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled Error:', err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
+
+// =========================
+// 11. START SERVER
+// =========================
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ JWT Secret: ${process.env.JWT_SECRET ? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY ? 'Loaded' : 'MISSING'}`);
+  console.log(`✅ MongoDB: ${process.env.MONGODB_URI ? 'Connected' : 'MISSING'}`);
+  console.log(`🚀 CreativePay Phase 3 server running on port ${PORT}`);
+});
