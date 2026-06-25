@@ -116,13 +116,22 @@ const authMiddleware = async (req, res, next) => {
 // =========================
 const buildUserResponse = async (user) => {
   try {
-    // ✅ FIX: Cast user._id to ObjectId to match Wallet schema
     const userObjectId = new mongoose.Types.ObjectId(user._id);
 
     console.log('🔍 Building response for', user.email);
     console.log('🔍 Searching wallet for userId:', userObjectId);
 
-    const wallet = await Wallet.findOne({ userId: userObjectId }).lean();
+    let wallet = await Wallet.findOne({ userId: userObjectId }).lean();
+
+    // ✅ FIX: If wallet exists but walletId missing, generate it now
+    if (wallet && !wallet.walletId) {
+      console.log('🔧 Patching missing walletId for old wallet');
+      wallet = await Wallet.findOneAndUpdate(
+        { userId: userObjectId },
+        { $set: { walletId: `CPY-${Date.now()}-${user._id.toString().slice(-4)}` } },
+        { new: true }
+      ).lean();
+    }
 
     console.log('🔍 Wallet found:', wallet? 'YES' : 'NO');
     console.log('🔍 Balance:', wallet?.balance);
@@ -152,6 +161,7 @@ const buildUserResponse = async (user) => {
     };
   }
 };
+    
 
 // =========================
 // 7. API ROUTES
