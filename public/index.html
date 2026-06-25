@@ -149,11 +149,30 @@
     .fund-btn:hover { background: #1d4ed8; }
     .send-btn { background: #16a34a; }
     .send-btn:hover { background: #15803d; }
+    .history-btn { background: #475569; }
+    .history-btn:hover { background: #334155; }
     #output-window {
       background: #0f172a; padding: 16px; border-radius: 8px;
       font-family: monospace; font-size: 12px; overflow-x: auto;
       margin-top: 20px; border: 1px solid #334155; white-space: pre-wrap;
     }
+    /* MODAL STYLES */
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); display: flex; align-items: center;
+      justify-content: center; z-index: 1000;
+    }
+    .modal-content {
+      background: #1e293b; padding: 30px; border-radius: 12px;
+      width: 90%; max-width: 400px; border: 1px solid #334155;
+    }
+    .tx-row {
+      display: flex; justify-content: space-between; padding: 12px 0;
+      border-bottom: 1px solid #334155; font-size: 14px;
+    }
+    .tx-credit { color: #4ade80; }
+    .tx-debit { color: #f87171; }
+    .tx-date { color: #64748b; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -241,18 +260,37 @@
         <button onclick="fundWallet()" id="fundBtn" class="action-btn fund-btn">
           + Fund Wallet
         </button>
-        <button onclick="alert('Send Money coming in Phase 4')" class="action-btn send-btn">
+        <button onclick="openSendModal()" class="action-btn send-btn">
           Send Money
         </button>
-        <button onclick="alert('History coming in Phase 4')" class="action-btn" style="background: #475569;">
+        <button onclick="loadTransactions()" class="action-btn history-btn">
           History
         </button>
       </div>
     </div>
 
+    <div class="card" id="transactionsCard" style="display: none;">
+      <h3>Transaction History</h3>
+      <div id="transactionsList"></div>
+    </div>
+
     <div class="card">
       <h3>System Status</h3>
       <pre id="outputWindow">Connecting...</pre>
+    </div>
+  </div>
+
+  <!-- SEND MONEY MODAL - PHASE 4A -->
+  <div id="sendModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Send Money</h2>
+      <div id="sendError" class="error hidden"></div>
+      <div id="sendSuccess" class="success hidden"></div>
+      <input type="text" id="sendRecipient" placeholder="Wallet ID (CPY-...) or Email" />
+      <input type="number" id="sendAmount" placeholder="Amount ₦" min="10" step="0.01" />
+      <input type="text" id="sendDesc" placeholder="Description (optional)" />
+      <button onclick="handleTransfer()" id="sendBtn">Send Money</button>
+      <div class="link" onclick="closeSendModal()">Cancel</div>
     </div>
   </div>
 
@@ -263,7 +301,7 @@
     // 1. CONFIG & STATE
     // =========================
     const API_URL = '';
-    const TOKEN_KEY = 'creativepay_token'; // ✅ FIXED: One token key for everything
+    const TOKEN_KEY = 'creativepay_token';
     let currentUser = null;
     let authCheckTimeout = null;
 
@@ -285,6 +323,7 @@
       const el = document.getElementById(id);
       el.textContent = msg;
       el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 5000);
     };
 
     const showLoader = () => {
@@ -329,7 +368,7 @@
     async function apiCall(endpoint, options = {}) {
       const token = getToken();
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const timeout = setTimeout(() => controller.abort(), 10000);
 
       try {
         const res = await fetch(`${API_URL}${endpoint}`, {
@@ -467,9 +506,8 @@
     // =========================
     async function loadDashboard(user = null) {
       showLoader();
-      
+
       try {
-        // If no user passed, fetch fresh
         if (!user) {
           const data = await apiCall('/api/user');
           user = data.user;
@@ -477,13 +515,12 @@
 
         currentUser = user;
 
-        // Update UI
         document.getElementById('userEmail').textContent = user.email || 'N/A';
         document.getElementById('userName').textContent = user.fullName || 'CreativePay User';
-        
+
         const balance = Number(user.balance || 0);
         document.getElementById('userBalance').textContent = `₦${balance.toFixed(2)}`;
-        
+
         document.getElementById('walletId').textContent = user.walletId 
           ? `Wallet ID: ${user.walletId}` 
           : 'Wallet ID: Complete KYC to activate';
@@ -572,7 +609,7 @@
         });
 
         alert(`Success! ₦${data.amount} added. New balance: ₦${data.newBalance.toFixed(2)}`);
-        await loadDashboard(); // Refresh
+        await loadDashboard();
       } catch (error) {
         alert('Verification failed: ' + error.message);
       } finally {
@@ -582,12 +619,111 @@
     }
 
     // =========================
-    // 7. AUTO-LOGIN ON PAGE LOAD
+    // 7. PHASE 4A: SEND MONEY
+    // =========================
+    function openSendModal() {
+      if (!currentUser || currentUser.kycTier < 1) {
+        alert('Complete BVN verification to send money');
+        return;
+      }
+      document.getElementById('sendModal').classList.remove('hidden');
+      document.getElementById('sendError').classList.add('hidden');
+      document.getElementById('sendSuccess').classList.add('hidden');
+    }
+
+    function closeSendModal() {
+      document.getElementById('sendModal').classList.add('hidden');
+      document.getElementById('sendRecipient').value = '';
+      document.getElementById('sendAmount').value = '';
+      document.getElementById('sendDesc').value = '';
+    }
+
+    async function handleTransfer() {
+      const recipient = document.getElementById('sendRecipient').value.trim();
+      const amount = document.getElementById('sendAmount').value;
+      const description = document.getElementById('sendDesc').value.trim();
+      const btn = document.getElementById('sendBtn');
+
+      if (!recipient || !amount || Number(amount) < 10) {
+        showError('sendError', 'Enter recipient and minimum ₦10');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      try {
+        const data = await apiCall('/api/transfer', {
+          method: 'POST',
+          body: JSON.stringify({ recipient, amount, description })
+        });
+
+        showSuccess('sendSuccess', data.message);
+        setTimeout(() => {
+          closeSendModal();
+          loadDashboard();
+        }, 2000);
+      } catch (error) {
+        showError('sendError', error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Money';
+      }
+    }
+
+    // =========================
+    // 8. PHASE 4A: TRANSACTION HISTORY
+    // =========================
+    async function loadTransactions() {
+      const card = document.getElementById('transactionsCard');
+      const list = document.getElementById('transactionsList');
+      
+      card.style.display = 'block';
+      list.innerHTML = '<p style="text-align:center;color:#64748b;">Loading...</p>';
+
+      try {
+        const data = await apiCall('/api/transactions');
+        
+        if (!data.transactions || data.transactions.length === 0) {
+          list.innerHTML = '<p style="text-align:center;color:#64748b;">No transactions yet</p>';
+          return;
+        }
+
+        list.innerHTML = data.transactions.map(tx => {
+          const isCredit = tx.receiverId?._id === currentUser.id || tx.type === 'credit';
+          const amountClass = isCredit ? 'tx-credit' : 'tx-debit';
+          const sign = isCredit ? '+' : '-';
+          const otherParty = isCredit 
+            ? (tx.senderId?.email || tx.senderId?.walletId || 'System')
+            : (tx.receiverId?.email || tx.receiverId?.walletId || 'System');
+          const desc = tx.description || (isCredit ? `From ${otherParty}` : `To ${otherParty}`);
+          const date = new Date(tx.createdAt).toLocaleString('en-NG', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+
+          return `
+            <div class="tx-row">
+              <div>
+                <div style="font-weight:600;">${desc}</div>
+                <div class="tx-date">${date} • ${tx.reference}</div>
+              </div>
+              <div class="${amountClass}" style="font-weight:700;">
+                ${sign}₦${Number(tx.amount).toFixed(2)}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        list.innerHTML = `<p style="text-align:center;color:#dc2626;">Error: ${error.message}</p>`;
+      }
+    }
+
+    // =========================
+    // 9. AUTO-LOGIN ON PAGE LOAD
     // =========================
     async function init() {
       showLoader();
-      
-      // Kill any hanging requests after 15s
+
       authCheckTimeout = setTimeout(() => {
         document.querySelector('#loader p').textContent = 'Still loading... Check your connection';
       }, 15000);
@@ -603,7 +739,7 @@
       try {
         const data = await apiCall('/api/user');
         clearTimeout(authCheckTimeout);
-        
+
         if (data.user.kycTier === 0) {
           showAuth();
           showBVN();
