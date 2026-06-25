@@ -112,7 +112,7 @@ const authMiddleware = async (req, res, next) => {
 };
 
 // =========================
-// 6. HELPER: BUILD USER RESPONSE - FINAL FIX
+// 6. HELPER: BUILD USER RESPONSE - BULLETPROOF FINAL
 // =========================
 const buildUserResponse = async (user) => {
   try {
@@ -121,21 +121,34 @@ const buildUserResponse = async (user) => {
     console.log('🔍 Building response for', user.email);
     console.log('🔍 Searching wallet for userId:', userObjectId);
 
-    let wallet = await Wallet.findOne({ userId: userObjectId }).lean();
+    let wallet = await Wallet.findOne({ userId: userObjectId });
 
-    // ✅ FIX: If wallet exists but walletId missing, generate it now
-    if (wallet && !wallet.walletId) {
+    // ✅ FIX 1: Patch missing/empty walletId BEFORE.lean()
+    if (wallet && (!wallet.walletId || wallet.walletId === '')) {
       console.log('🔧 Patching missing walletId for old wallet');
-      wallet = await Wallet.findOneAndUpdate(
-        { userId: userObjectId },
-        { $set: { walletId: `CPY-${Date.now()}-${user._id.toString().slice(-4)}` } },
-        { new: true }
-      ).lean();
+      wallet.walletId = `CPY-${Date.now()}-${user._id.toString().slice(-4)}`;
+      await wallet.save();
     }
 
+    // Convert to plain object AFTER patching
+    if (wallet) wallet = wallet.toObject();
+
     console.log('🔍 Wallet found:', wallet? 'YES' : 'NO');
-    console.log('🔍 Balance:', wallet?.balance);
+    console.log('🔍 Raw Balance:', wallet?.balance, 'Type:', typeof wallet?.balance);
     console.log('🔍 WalletId:', wallet?.walletId);
+
+    // ✅ FIX 2: Safe balance casting - handles Number, String, Decimal128
+    let safeBalance = 0;
+    if (wallet?.balance!= null) {
+      if (typeof wallet.balance === 'object' && wallet.balance.toString) {
+        // Handle Decimal128
+        safeBalance = parseFloat(wallet.balance.toString());
+      } else {
+        // Handle Number or String
+        safeBalance = parseFloat(wallet.balance);
+      }
+      if (isNaN(safeBalance)) safeBalance = 0;
+    }
 
     return {
       id: user._id,
@@ -143,7 +156,7 @@ const buildUserResponse = async (user) => {
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
-      balance: Number(wallet?.balance || 0),
+      balance: safeBalance,
       walletId: wallet?.walletId || null,
       createdAt: user.createdAt
     };
@@ -161,7 +174,6 @@ const buildUserResponse = async (user) => {
     };
   }
 };
-    
 
 // =========================
 // 7. API ROUTES
