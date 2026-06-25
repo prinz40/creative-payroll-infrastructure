@@ -358,33 +358,29 @@
       btn.innerHTML = '<div class="action-icon">⏳</div><div class="action-label">Processing...</div>';
       btn.style.pointerEvents = 'none';
 
-      let handler = PaystackPop.setup({
-        key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e', // YOUR KEY INSERTED
-        email: currentUser.email,
-        amount: amountInKobo,
-        currency: 'NGN',
-        ref: 'CPY-FUND-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-        metadata: {
-          userId: currentUser._id,
-          custom_fields: [{
-            display_name: "Wallet ID",
-            variable_name: "wallet_id", 
-            value: currentUser.walletId
-          }]
-        },
-        callback: function(response) {
-          btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
-          btn.style.pointerEvents = 'auto';
-          verifyPaymentOnServer(response.reference);
-        },
-        onClose: function() {
-          btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
-          btn.style.pointerEvents = 'auto';
-          alert('Payment window closed.');
-        }
-      });
-      handler.openIframe();
-    }
+          let handler = PaystackPop.setup({
+      key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
+      email: currentUser.email,
+      amount: amountInKobo,
+      currency: 'NGN',
+      ref: 'CPY-FUND-' + Date.now() + '-' + (currentUser.id || currentUser._id).toString().slice(-4),
+      metadata: { 
+        userId: currentUser.id || currentUser._id,
+        user_id: currentUser.id || currentUser._id
+      },
+      callback: function(response) {
+        btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
+        btn.style.pointerEvents = 'auto';
+        verifyPaymentOnServer(response.reference);
+      },
+      onClose: function() {
+        alert('Payment window closed.');
+        btn.innerHTML = '<div class="action-icon">➕</div><div class="action-label">Fund Wallet</div>';
+        btn.style.pointerEvents = 'auto';
+      }
+    });
+    handler.openIframe();
+
 
     async function verifyPaymentOnServer(reference) {
       try {
