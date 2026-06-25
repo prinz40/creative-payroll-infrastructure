@@ -140,7 +140,7 @@
 
         const data = await res.json();
 
-        // Fix: Gracefully handle both flat objects and nested data formats
+        // Fix: Handles flat responses and nested object parameters dynamically
         const userData = data.user ? data.user : data;
 
         window.currentUser = userData;
@@ -184,10 +184,10 @@
         document.getElementById('kyc-banner').style.display = 'none';
       }
 
-      // ✅ FIX: Bulletproof balance display
+      // Balance tracking safely parsed out of raw strings
       const balance = Number(userData.balance || 0);
       document.getElementById('user-balance').textContent = `₦${balance.toFixed(2)}`;
-      
+
       document.getElementById('wallet-id').textContent = userData.walletId 
         ? `Wallet ID: ${userData.walletId}` 
         : 'Wallet ID: Complete KYC to activate';
@@ -197,7 +197,10 @@
     // 3. FUND WALLET - COMPLETE FLOW WITH AUTO-REFRESH
     // =========================
     function fundWallet() {
-      if (!window.currentUser?.id) {
+      // Fix: Account for variable structure fallbacks across id values
+      const userId = window.currentUser?.id || window.currentUser?._id;
+
+      if (!userId) {
         alert('Please wait, loading your account...');
         return;
       }
@@ -216,7 +219,6 @@
       fundBtn.disabled = true;
       fundBtn.innerText = 'Opening Paystack...';
 
-      const userId = window.currentUser.id;
       const userEmail = window.currentUser.email;
 
       let handler = PaystackPop.setup({
@@ -225,7 +227,11 @@
         amount: Number(amount) * 100,
         currency: 'NGN',
         ref: 'CPY-FUND-' + Date.now() + '-' + userId.slice(-4),
-        metadata: { user_id: userId },
+        // FIX: Pass both formatting parameters so the transaction handler links correctly
+        metadata: { 
+          user_id: userId,
+          userId: userId
+        },
         onClose: function(){
           alert('Payment cancelled');
           fundBtn.disabled = false;
@@ -255,20 +261,9 @@
         const data = await res.json();
 
         if(data.success) {
-          // ✅ FIX: Re-fetch from server instead of trusting response
+          // Re-fetch account profile state variables instantly to synchronize UI elements
           await loadUserData();
           alert(`Success! ₦${data.amount} added. Your balance has been updated.`);
         } else {
           alert('Verification failed: ' + data.message);
         }
-      } catch (err) {
-        console.error('Verify Error:', err);
-        alert('Error verifying payment. Contact support with ref: ' + reference);
-      } finally {
-        fundBtn.disabled = false;
-        fundBtn.innerText = '+ Fund Wallet';
-      }
-    }
-  </script>
-</body>
-</html>
