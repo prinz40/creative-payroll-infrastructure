@@ -141,6 +141,9 @@
     .action-grid {
       display: grid; gap: 12px; grid-template-columns: 1fr 1fr;
     }
+    @media (max-width: 600px) {
+      .action-grid { grid-template-columns: 1fr 1fr; }
+    }
     .action-btn {
       padding: 12px; border: none; border-radius: 6px; color: white; 
       cursor: pointer; font-weight: 600; width: 100%;
@@ -155,7 +158,7 @@
       width: auto; padding: 6px 12px; font-size: 12px; background: #475569; margin: 0;
     }
     .back-btn:hover { background: #334155; }
-    #output-window {
+    #outputWindow {
       background: #0f172a; padding: 16px; border-radius: 8px;
       font-family: monospace; font-size: 12px; overflow-x: auto;
       margin-top: 20px; border: 1px solid #334155; white-space: pre-wrap;
@@ -568,7 +571,6 @@
         handleLogout();
       }
     }
-
     // =========================
     // 6. FUND WALLET
     // =========================
@@ -633,7 +635,6 @@
         fundBtn.textContent = '+ Fund Wallet';
       }
     }
-
     // =========================
     // 7. SEND MONEY - PHASE 4A
     // =========================
@@ -652,9 +653,7 @@
 
     function closeSendModal() {
       document.getElementById('sendModal').classList.add('hidden');
-    }
-
-    async function handleTransfer() {
+    }    async function handleTransfer() {
       const recipient = document.getElementById('sendRecipient').value.trim();
       const amount = document.getElementById('sendAmount').value;
       const description = document.getElementById('sendDesc').value.trim();
