@@ -48,7 +48,7 @@
       font-weight: 600;
       margin-bottom: 20px;
     }
-    input {
+    input, select { /* ADDED SELECT */
       width: 100%;
       padding: 12px;
       margin: 8px 0;
@@ -58,7 +58,7 @@
       color: #e2e8f0;
       font-size: 16px;
     }
-    input:focus { outline: none; border-color: #38bdf8; }
+    input:focus, select:focus { outline: none; border-color: #38bdf8; } /* ADDED SELECT */
     button {
       width: 100%;
       padding: 12px;
@@ -123,6 +123,11 @@
     .balance-card { text-align: center; }
     .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
     .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
+    .balances-row { /* NEW: For 3 currencies */
+      display: flex; justify-content: space-around; margin-top: 12px; font-size: 14px;
+    }
+    .balances-row span { color: #94a3b8; }
+    .balances-row strong { color: #e2e8f0; }
     .wallet-id { font-size: 12px; color: #64748b; margin-top: 8px; font-family: monospace; }
     .kyc-badge {
       display: inline-block; padding: 6px 12px; border-radius: 20px;
@@ -259,8 +264,13 @@
     </div>
 
     <div class="card balance-card">
-      <div class="balance-label">Available Balance</div>
-      <div class="balance-amount" id="userBalance">₦0.00</div>
+      <div class="balance-label">Available Balances</div> <!-- CHANGED -->
+      <div class="balance-amount" id="userBalance">₦0.00</div> <!-- Primary currency -->
+      <div class="balances-row" id="allBalances"> <!-- NEW: Show all 3 -->
+        <span>NGN: <strong id="balNGN">₦0</strong></span>
+        <span>GHS: <strong id="balGHS">GH₵0</strong></span>
+        <span>KES: <strong id="balKES">KSh0</strong></span>
+      </div>
       <div class="wallet-id" id="walletId">Wallet ID: Loading...</div>
     </div>
 
@@ -521,7 +531,7 @@
     }
 
     // =========================
-    // 5. DASHBOARD
+    // 5. DASHBOARD - 4B UPGRADE
     // =========================
     async function loadDashboard(user = null) {
       showLoader();
@@ -537,8 +547,18 @@
         document.getElementById('userEmail').textContent = user.email || 'N/A';
         document.getElementById('userName').textContent = user.fullName || 'CreativePay User';
 
-        const balance = Number(user.balance || 0);
-        document.getElementById('userBalance').textContent = `₦${balance.toFixed(2)}`;
+        // 4B: Show all balances
+        const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
+        const active = user.activeCurrency || 'NGN';
+        
+        document.getElementById('balNGN').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
+        document.getElementById('balGHS').textContent = `GH₵${Number(balances.GHS || 0).toFixed(2)}`;
+        document.getElementById('balKES').textContent = `KSh${Number(balances.KES || 0).toFixed(2)}`;
+        
+        // Main balance shows active currency
+        const mainBalance = balances[active] || 0;
+        const symbol = active === 'NGN' ? '₦' : active === 'GHS' ? 'GH₵' : 'KSh';
+        document.getElementById('userBalance').textContent = `${symbol}${Number(mainBalance).toFixed(2)}`;
 
         document.getElementById('walletId').textContent = user.walletId 
           ? `Wallet ID: ${user.walletId}` 
@@ -558,10 +578,11 @@
           return;
         }
 
-        document.getElementById('outputWindow').textContent = 
-          `✅ Connected to CreativePay\n` +
+                document.getElementById('outputWindow').textContent = 
+          `✅ Connected to CreativePay Phase 4B\n` +
           `User: ${user.email}\n` +
-          `Balance: ₦${balance.toFixed(2)}\n` +
+          `Balances: NGN ₦${balances.NGN} | GHS GH₵${balances.GHS} | KES KSh${balances.KES}\n` +
+          `Active: ${active}\n` +
           `Wallet: ${user.walletId || 'Pending'}\n` +
           `KYC: Tier ${user.kycTier}`;
 
@@ -572,10 +593,10 @@
       }
     }
     // =========================
-    // 6. FUND WALLET
+    // 6. FUND WALLET - 4B UPGRADE
     // =========================
     function fundWallet() {
-      if (!currentUser || !currentUser.id) {
+      if (!currentUser ||!currentUser.id) {
         alert('Please wait, loading account...');
         return;
       }
@@ -584,9 +605,17 @@
         return;
       }
 
-      let amount = prompt("Enter amount to fund (₦):", "1000");
+      // 4B: Currency selection modal
+      const currency = prompt("Select currency to fund:\n1 = NGN ₦\n2 = GHS GH₵\n3 = KES KSh", "1");
+      let selectedCurrency = 'NGN';
+      if (currency === '2') selectedCurrency = 'GHS';
+      if (currency === '3') selectedCurrency = 'KES';
+
+      const symbol = selectedCurrency === 'NGN'? '₦' : selectedCurrency === 'GHS'? 'GH₵' : 'KSh';
+      let amount = prompt(`Enter amount to fund (${symbol}):`, "1000");
+      
       if (!amount || isNaN(amount) || Number(amount) < 100) {
-        alert("Minimum funding amount is ₦100");
+        alert(`Minimum funding amount is ${symbol}100`);
         return;
       }
 
@@ -594,15 +623,21 @@
       fundBtn.disabled = true;
       fundBtn.textContent = 'Opening Paystack...';
 
+      // Convert to NGN for Paystack. Paystack only takes NGN
+      const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
+      const amountNGN = Math.ceil(Number(amount) / RATES[selectedCurrency]);
+
       let handler = PaystackPop.setup({
         key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         email: currentUser.email,
-        amount: Number(amount) * 100,
-        currency: 'NGN',
+        amount: amountNGN * 100,
+        currency: 'NGN', // Paystack is NGN only
         ref: 'CPY-FUND-' + Date.now() + '-' + currentUser.id.slice(-4),
         metadata: { 
           user_id: currentUser.id,
-          userId: currentUser.id
+          userId: currentUser.id,
+          fund_currency: selectedCurrency, // Send target currency to backend
+          fund_amount: Number(amount)
         },
         onClose: function(){
           alert('Payment cancelled');
@@ -610,23 +645,24 @@
           fundBtn.textContent = '+ Fund Wallet';
         },
         callback: function(response){
-          verifyPayment(response.reference);
+          verifyPayment(response.reference, selectedCurrency);
         }
       });
       handler.openIframe();
     }
 
-    async function verifyPayment(reference) {
+    async function verifyPayment(reference, currency = 'NGN') {
       const fundBtn = document.getElementById('fundBtn');
       fundBtn.textContent = 'Verifying...';
 
       try {
         const data = await apiCall('/api/fund-wallet/verify', {
           method: 'POST',
-          body: JSON.stringify({ reference })
+          body: JSON.stringify({ reference, currency }) // 4B: Send currency
         });
 
-        alert(`✅ Wallet funded successfully!\nNew balance: ₦${data.newBalance.toFixed(2)}`);
+        const symbol = currency === 'NGN'? '₦' : currency === 'GHS'? 'GH₵' : 'KSh';
+        alert(`✅ Wallet funded successfully!\n${currency} ${data.amount.toFixed(2)} added\nNew ${currency} Balance: ${symbol}${data.balances[currency].toFixed(2)}`);
         loadDashboard();
       } catch (error) {
         alert('Payment verification failed: ' + error.message);
@@ -653,13 +689,15 @@
 
     function closeSendModal() {
       document.getElementById('sendModal').classList.add('hidden');
-    }    async function handleTransfer() {
+    } 
+    
+    async function handleTransfer() {
       const recipient = document.getElementById('sendRecipient').value.trim();
       const amount = document.getElementById('sendAmount').value;
       const description = document.getElementById('sendDesc').value.trim();
       const btn = document.getElementById('sendBtn');
 
-      if (!recipient || !amount) {
+      if (!recipient ||!amount) {
         showError('sendError', 'Recipient and amount required');
         return;
       }
@@ -667,8 +705,11 @@
         showError('sendError', 'Minimum transfer is ₦10');
         return;
       }
-      if (Number(amount) > currentUser.balance) {
-        showError('sendError', 'Insufficient balance');
+      
+      // 4B: Check balance in active currency
+      const active = currentUser.activeCurrency || 'NGN';
+      if (Number(amount) > (currentUser.balances?.[active] || 0)) {
+        showError('sendError', `Insufficient ${active} balance`);
         return;
       }
 
@@ -678,10 +719,11 @@
       try {
         const data = await apiCall('/api/transfer', {
           method: 'POST',
-          body: JSON.stringify({ recipient, amount: Number(amount), description })
+          body: JSON.stringify({ recipient, amount: Number(amount), description, currency: active })
         });
 
         showSuccess('sendSuccess', data.message);
+        currentUser.balances = data.balances; // Update local state
         setTimeout(() => {
           closeSendModal();
           loadDashboard();
@@ -700,23 +742,25 @@
       try {
         const data = await apiCall('/api/transactions');
         const list = document.getElementById('transactionsList');
-        
+
         if (data.transactions.length === 0) {
           list.innerHTML = '<p style="text-align:center;color:#64748b;">No transactions yet</p>';
         } else {
-          list.innerHTML = data.transactions.map(tx => `
+          list.innerHTML = data.transactions.map(tx => {
+            const symbol = tx.currency === 'NGN'? '₦' : tx.currency === 'GHS'? 'GH₵' : 'KSh';
+            return `
             <div class="tx-row">
               <div>
-                <div>${tx.description || tx.type}</div>
+                <div>${tx.description || tx.type} ${tx.currency? `(${tx.currency})` : ''}</div>
                 <div class="tx-date">${new Date(tx.createdAt).toLocaleString()}</div>
               </div>
-              <div class="${tx.amount > 0 ? 'tx-credit' : 'tx-debit'}">
-                ${tx.amount > 0 ? '+' : ''}₦${Math.abs(tx.amount).toFixed(2)}
+              <div class="${tx.amount > 0? 'tx-credit' : 'tx-debit'}">
+                ${tx.amount > 0? '+' : ''}${symbol}${Math.abs(tx.amount).toFixed(2)}
               </div>
             </div>
-          `).join('');
+          `}).join('');
         }
-        
+
         document.getElementById('transactionsCard').style.display = 'block';
       } catch (error) {
         showError('sendError', 'Failed to load transactions');
