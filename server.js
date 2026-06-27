@@ -336,11 +336,12 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   }
 });
 
-// FUND WALLET VERIFY - 4B UPGRADE: Accepts currency
+
+// FUND WALLET VERIFY - 4B UPGRADE: FIXED PAYSTACK RESPONSE
 app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { reference, currency = 'NGN' } = req.body; // Frontend sends currency
+    const { reference, currency = 'NGN' } = req.body;
     const userObjectId = new mongoose.Types.ObjectId(req.user.id);
 
     if (!reference) {
@@ -356,7 +357,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
       return res.json({
         success: true,
         message: 'Transaction already verified',
-        balances: wallet?.balances? Object.fromEntries(wallet.balances) : { NGN: 0 },
+        balances: wallet?.balances? Object.fromEntries(wallet.balances) : { NGN: 0, GHS: 0, KES: 0 },
         amount: existingTxn.amount
       });
     }
@@ -369,21 +370,25 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
       }
     );
 
-    const { status, amount } = paystackRes.data;
-    if (status!== 'success') {
-      await Transaction.create({ userId: userObjectId, reference, amount: amount || 0, amountNGN: 0, status: 'failed', type: 'credit', currency });
+    // FIXED: Check the correct path
+    const paystackData = paystackRes.data; 
+    if (!paystackRes.data.status || paystackData.status!== 'success') {
+      await Transaction.create({ userId: userObjectId, reference, amount: 0, amountNGN: 0, status: 'failed', type: 'credit', currency });
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
 
-    const amountNGN = amount / 100; // Paystack is always NGN
+    const amountNGN = paystackData.amount / 100; // Paystack is always kobo
     const amountInCurrency = parseFloat((amountNGN * RATES[currency]).toFixed(2));
 
     let wallet;
     await session.withTransaction(async () => {
       wallet = await Wallet.findOne({ userId: userObjectId }).session(session);
       if (!wallet) throw new Error('Wallet not found');
-      
-      await wallet.addBalance(currency, amountInCurrency); // Use new helper
+
+      // Auto-seed balances if missing
+      if (!wallet.balances) wallet.balances = new Map([['NGN', 0], ['GHS', 0], ['KES', 0]]);
+      wallet.balances.set(currency, (wallet.balances.get(currency) || 0) + amountInCurrency);
+      await wallet.save({ session });
 
       await Transaction.findOneAndUpdate(
         { reference },
@@ -396,7 +401,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
           type: 'credit',
           currency,
           channel: 'paystack',
-          metadata: paystackRes.data
+          metadata: paystackData
         },
         { upsert: true, new: true, session }
       );
@@ -418,7 +423,6 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
     await session.endSession();
   }
 });
-
 // =========================
 // PHASE 4A: SEND MONEY - P2P TRANSFERS
 // =========================
