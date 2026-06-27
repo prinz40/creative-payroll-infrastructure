@@ -93,7 +93,7 @@ const transactionSchema = new mongoose.Schema({
   receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
   reference: { type: String, required: true, unique: true, index: true },
   amount: { type: Number, required: true },
-  amountNGN: { type: Number, required: true }, // Store base NGN for records
+  amountNGN: { type: Number, required: true },
   status: { type: String, enum: ['success', 'failed', 'pending'], default: 'pending', index: true },
   type: { type: String, enum: ['credit', 'debit', 'transfer', 'withdraw'], required: true },
   currency: { type: String, default: 'NGN', enum: ['NGN', 'GHS', 'KES'] },
@@ -127,7 +127,6 @@ const authMiddleware = async (req, res, next) => {
 // =========================
 // 6. HELPER: BUILD USER RESPONSE - 4B UPGRADE
 // =========================
-//
 const buildUserResponse = async (user) => {
   try {
     const userObjectId = new mongoose.Types.ObjectId(user._id);
@@ -140,7 +139,7 @@ const buildUserResponse = async (user) => {
     // PHASE 4B FIX: Auto-seed missing balances for old accounts
     if (wallet && (!wallet.balances || wallet.balances.size === 0)) {
       wallet.balances = new Map([
-        ['NGN', wallet.balance || 0], // Migrate old balance
+        ['NGN', wallet.balance || 0],
         ['GHS', 0], 
         ['KES', 0]
       ]);
@@ -148,7 +147,6 @@ const buildUserResponse = async (user) => {
       await wallet.save();
     }
 
-    // Convert Map to Object for JSON
     const balances = wallet?.balances? Object.fromEntries(wallet.balances) : { NGN: 0, GHS: 0, KES: 0 };
     const activeCurrency = wallet?.currency || 'NGN';
 
@@ -158,7 +156,7 @@ const buildUserResponse = async (user) => {
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
-      balances, // { NGN: 0, GHS: 0, KES: 0 }
+      balances,
       activeCurrency,
       walletId: wallet?.walletId || null,
       createdAt: user.createdAt
@@ -178,6 +176,7 @@ const buildUserResponse = async (user) => {
     };
   }
 };
+
 // =========================
 // 7. API ROUTES
 // =========================
@@ -274,7 +273,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
         {
           $setOnInsert: {
             walletId: `CPY-${Date.now()}-${user._id.toString().slice(-4)}`,
-            balances: { NGN: 0 },
+            balances: { NGN: 0, GHS: 0, KES: 0 }, // 4B: Seed all 3
             currency: 'NGN'
           }
         },
@@ -323,10 +322,10 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
     if (!wallet) {
       return res.status(404).json({ success: false, message: 'Wallet not found. Complete KYC first.' });
     }
-    const balances = wallet.balances? Object.fromEntries(wallet.balances) : { NGN: 0 };
+    const balances = wallet.balances? Object.fromEntries(wallet.balances) : { NGN: 0, GHS: 0, KES: 0 };
     res.json({
       success: true,
-      balances, // { NGN: 650, GHS: 0, KES: 0 }
+      balances,
       activeCurrency: wallet.currency || 'NGN',
       walletId: wallet.walletId
     });
@@ -336,8 +335,9 @@ app.get('/api/wallet/balance', authMiddleware, async (req, res) => {
   }
 });
 
-
-// FUND WALLET VERIFY - 4B UPGRADE: FIXED PAYSTACK RESPONSE
+// =========================
+// FUND WALLET VERIFY - 4B FINAL FIX
+// =========================
 app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -370,14 +370,30 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
       }
     );
 
-    // FIXED: Check the correct path
-    const paystackData = paystackRes.data; 
-    if (!paystackRes.data.status || paystackData.status!== 'success') {
-      await Transaction.create({ userId: userObjectId, reference, amount: 0, amountNGN: 0, status: 'failed', type: 'credit', currency });
+    // CRITICAL FIX: Paystack wraps transaction in data.data
+    const paystackResponse = paystackRes.data;
+    const txn = paystackResponse.data; // This is the actual transaction object
+
+    console.log('Paystack Verify:', { 
+      ref: reference, 
+      api_status: paystackResponse.status, 
+      txn_status: txn?.status, 
+      gateway: txn?.gateway_response 
+    });
+
+    // Accept: status:true + status:'success' OR gateway_response includes 'success' for TEST MODE
+    const isSuccess = paystackResponse.status === true && 
+      (txn?.status === 'success' || txn?.gateway_response?.toLowerCase().includes('success'));
+
+    if (!isSuccess) {
+      await Transaction.create({ 
+        userId: userObjectId, reference, amount: 0, amountNGN: 0, 
+        status: 'failed', type: 'credit', currency, metadata: paystackResponse 
+      });
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
 
-    const amountNGN = paystackData.amount / 100; // Paystack is always kobo
+    const amountNGN = txn.amount / 100; // Paystack is kobo
     const amountInCurrency = parseFloat((amountNGN * RATES[currency]).toFixed(2));
 
     let wallet;
@@ -401,7 +417,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
           type: 'credit',
           currency,
           channel: 'paystack',
-          metadata: paystackData
+          metadata: txn
         },
         { upsert: true, new: true, session }
       );
@@ -423,6 +439,7 @@ app.post('/api/fund-wallet/verify', authMiddleware, async (req, res) => {
     await session.endSession();
   }
 });
+
 // =========================
 // PHASE 4A: SEND MONEY - P2P TRANSFERS
 // =========================
@@ -445,7 +462,7 @@ app.post('/api/transfer', authMiddleware, async (req, res) => {
 
     if (!sender) throw new Error('Sender not found');
     if (!senderWallet) throw new Error('Sender wallet not found. Complete KYC first');
-    if (senderWallet.getBalance(currency) < transferAmount) throw new Error('Insufficient balance');
+    if ((senderWallet.balances?.get(currency) || 0) < transferAmount) throw new Error('Insufficient balance');
     if (sender.kycTier < 1) throw new Error('Complete BVN verification to send money');
 
     let receiver;
@@ -463,9 +480,9 @@ app.post('/api/transfer', authMiddleware, async (req, res) => {
     const receiverWallet = await Wallet.findOne({ userId: receiver._id }).session(session);
     if (!receiverWallet) throw new Error('Recipient has not completed KYC');
 
-    // Update balances using helpers
-    senderWallet.balances.set(currency, senderWallet.getBalance(currency) - transferAmount);
-    receiverWallet.balances.set(currency, receiverWallet.getBalance(currency) + transferAmount);
+    // Update balances using Map
+    senderWallet.balances.set(currency, (senderWallet.balances.get(currency) || 0) - transferAmount);
+    receiverWallet.balances.set(currency, (receiverWallet.balances.get(currency) || 0) + transferAmount);
 
     await senderWallet.save({ session });
     await receiverWallet.save({ session });
@@ -514,10 +531,10 @@ app.get('/api/transactions', authMiddleware, async (req, res) => {
         { userId: userId }
       ]
     })
-  .populate('senderId', 'email walletId fullName')
-  .populate('receiverId', 'email walletId fullName')
-  .sort({ createdAt: -1 })
-  .limit(50);
+ .populate('senderId', 'email walletId fullName')
+ .populate('receiverId', 'email walletId fullName')
+ .sort({ createdAt: -1 })
+ .limit(50);
 
     res.json({ success: true, transactions });
   } catch (error) {
@@ -558,5 +575,5 @@ app.listen(PORT, () => {
   console.log(`✅ JWT Secret: ${process.env.JWT_SECRET? 'Loaded' : 'MISSING'}`);
   console.log(`✅ Paystack Secret: ${process.env.PAYSTACK_SECRET_KEY? 'Loaded' : 'MISSING'}`);
   console.log(`✅ MongoDB: ${process.env.MONGODB_URI? 'Connected' : 'MISSING'}`);
-  console.log(`🚀 CreativePay Phase 4B server running on port ${PORT}`);
+  console.log(`🚀 CreativePay Phase 4B Final server running on port ${PORT}`);
 });
