@@ -12,7 +12,7 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       min-height: 100vh;
     }
-    .container {
+   .container {
       background: #1e293b;
       padding: 30px;
       border-radius: 12px;
@@ -22,7 +22,7 @@
       margin: 20px auto;
       box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    .dashboard-container {
+   .dashboard-container {
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
@@ -30,7 +30,7 @@
     h1 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 24px; }
     h2 { text-align: center; margin-bottom: 20px; }
     h3 { margin-bottom: 16px; }
-    .kyc-warning {
+   .kyc-warning {
       background: #854d0e;
       color: #facc15;
       padding: 12px;
@@ -39,7 +39,7 @@
       font-size: 14px;
       text-align: center;
     }
-    .kyc-banner {
+   .kyc-banner {
       background: #166534; 
       color: #4ade80; 
       padding: 12px;
@@ -48,7 +48,7 @@
       font-weight: 600;
       margin-bottom: 20px;
     }
-    input, select { /* ADDED SELECT */
+    input, select {
       width: 100%;
       padding: 12px;
       margin: 8px 0;
@@ -58,7 +58,7 @@
       color: #e2e8f0;
       font-size: 16px;
     }
-    input:focus, select:focus { outline: none; border-color: #38bdf8; } /* ADDED SELECT */
+    input:focus, select:focus { outline: none; border-color: #38bdf8; }
     button {
       width: 100%;
       padding: 12px;
@@ -73,14 +73,14 @@
     }
     button:hover { background: #1d4ed8; }
     button:disabled { background: #475569; cursor: not-allowed; }
-    .link {
+   .link {
       text-align: center;
       margin-top: 15px;
       color: #38bdf8;
       cursor: pointer;
       font-size: 14px;
     }
-    .error {
+   .error {
       background: #dc2626;
       color: white;
       padding: 10px;
@@ -89,7 +89,7 @@
       text-align: center;
       font-size: 14px;
     }
-    .success {
+   .success {
       background: #16a34a;
       color: white;
       padding: 10px;
@@ -98,9 +98,9 @@
       text-align: center;
       font-size: 14px;
     }
-    .hidden { display: none !important; }
-    .loader { text-align: center; padding: 50px 0; }
-    .spinner { 
+   .hidden { display: none!important; }
+   .loader { text-align: center; padding: 50px 0; }
+   .spinner { 
       border: 3px solid #334155; 
       border-top: 3px solid #38bdf8; 
       border-radius: 50%; 
@@ -111,97 +111,91 @@
     }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }
 
-    /* DASHBOARD STYLES */
-    .header {
+   .header {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155;
     }
-    .card {
+   .card {
       background: #1e293b; padding: 24px; border-radius: 12px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
     }
-    .balance-card { text-align: center; }
-    .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
-    .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
-    .balances-row { /* NEW: For 3 currencies */
+   .balance-card { text-align: center; }
+   .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
+   .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
+   .balances-row {
       display: flex; justify-content: space-around; margin-top: 12px; font-size: 14px;
     }
-    .balances-row span { color: #94a3b8; }
-    .balances-row strong { color: #e2e8f0; }
-    .wallet-id { font-size: 12px; color: #64748b; margin-top: 8px; font-family: monospace; }
-    .kyc-badge {
+   .balances-row span { color: #94a3b8; }
+   .balances-row strong { color: #e2e8f0; }
+   .wallet-id { font-size: 12px; color: #64748b; margin-top: 8px; font-family: monospace; }
+   .kyc-badge {
       display: inline-block; padding: 6px 12px; border-radius: 20px;
       font-size: 12px; font-weight: 600; margin-top: 12px;
       background: #334155; color: #94a3b8;
     }
-    .kyc-verified { background: #166534; color: #4ade80; }
-    .user-info { display: flex; justify-content: space-between; margin-bottom: 12px; }
-    .label { color: #94a3b8; font-size: 14px; }
-    .value { font-weight: 600; }
-    .logout-btn {
+   .kyc-verified { background: #166534; color: #4ade80; }
+   .user-info { display: flex; justify-content: space-between; margin-bottom: 12px; }
+   .label { color: #94a3b8; font-size: 14px; }
+   .value { font-weight: 600; }
+   .logout-btn {
       background: #dc2626; color: white; border: none;
       padding: 8px 16px; border-radius: 6px; cursor: pointer; width: auto;
     }
-    .logout-btn:hover { background: #b91c1c; }
-    .action-grid {
+   .logout-btn:hover { background: #b91c1c; }
+   .action-grid {
       display: grid; gap: 12px; grid-template-columns: 1fr 1fr;
     }
     @media (max-width: 600px) {
-      .action-grid { grid-template-columns: 1fr 1fr; }
+     .action-grid { grid-template-columns: 1fr 1fr; }
     }
-    .action-btn {
+   .action-btn {
       padding: 12px; border: none; border-radius: 6px; color: white; 
       cursor: pointer; font-weight: 600; width: 100%;
     }
-    .fund-btn { background: #2563eb; grid-column: span 2; }
-    .fund-btn:hover { background: #1d4ed8; }
-    .send-btn { background: #16a34a; }
-    .send-btn:hover { background: #15803d; }
-    .history-btn { background: #475569; }
-    .history-btn:hover { background: #334155; }
-    .back-btn {
+   .fund-btn { background: #2563eb; grid-column: span 2; }
+   .fund-btn:hover { background: #1d4ed8; }
+   .send-btn { background: #16a34a; }
+   .send-btn:hover { background: #15803d; }
+   .history-btn { background: #475569; }
+   .history-btn:hover { background: #334155; }
+   .back-btn {
       width: auto; padding: 6px 12px; font-size: 12px; background: #475569; margin: 0;
     }
-    .back-btn:hover { background: #334155; }
+   .back-btn:hover { background: #334155; }
     #outputWindow {
       background: #0f172a; padding: 16px; border-radius: 8px;
       font-family: monospace; font-size: 12px; overflow-x: auto;
       margin-top: 20px; border: 1px solid #334155; white-space: pre-wrap;
     }
-    /* MODAL STYLES */
-    .modal {
+   .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.8); display: flex; align-items: center;
       justify-content: center; z-index: 1000;
     }
-    .modal-content {
+   .modal-content {
       background: #1e293b; padding: 30px; border-radius: 12px;
       width: 90%; max-width: 400px; border: 1px solid #334155;
     }
-    .tx-row {
+   .tx-row {
       display: flex; justify-content: space-between; padding: 12px 0;
       border-bottom: 1px solid #334155; font-size: 14px;
     }
-    .tx-credit { color: #4ade80; }
-    .tx-debit { color: #f87171; }
-    .tx-date { color: #64748b; font-size: 12px; }
-    .card-header {
+   .tx-credit { color: #4ade80; }
+   .tx-debit { color: #f87171; }
+   .tx-date { color: #64748b; font-size: 12px; }
+   .card-header {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
     }
   </style>
 </head>
 <body>
-  <!-- LOADING STATE -->
   <div id="loader" class="loader">
     <div class="spinner"></div>
     <p>Loading CreativePay...</p>
   </div>
 
-  <!-- AUTH CONTAINER -->
   <div id="authContainer" class="container hidden">
     <h1>CreativePay</h1>
-
-    <!-- LOGIN FORM -->
     <div id="loginForm">
       <h2>Login</h2>
       <div id="loginError" class="error hidden"></div>
@@ -210,8 +204,6 @@
       <button onclick="handleLogin()" id="loginBtn">Login</button>
       <div class="link" onclick="showRegister()">Don't have an account? Register</div>
     </div>
-
-    <!-- REGISTER FORM -->
     <div id="registerForm" class="hidden">
       <h2>Register</h2>
       <div id="registerError" class="error hidden"></div>
@@ -221,8 +213,6 @@
       <button onclick="handleRegister()" id="registerBtn">Register</button>
       <div class="link" onclick="showLogin()">Already have an account? Login</div>
     </div>
-
-    <!-- BVN VERIFICATION -->
     <div id="bvnForm" class="hidden">
       <div class="kyc-warning">
         <strong>KYC TIER 1 REQUIRED</strong><br>
@@ -237,7 +227,6 @@
     </div>
   </div>
 
-  <!-- DASHBOARD -->
   <div id="dashboardContainer" class="dashboard-container hidden">
     <div class="header">
       <h1>CreativePay Dashboard</h1>
@@ -264,12 +253,12 @@
     </div>
 
     <div class="card balance-card">
-      <div class="balance-label">Available Balances</div> <!-- CHANGED -->
-      <div class="balance-amount" id="userBalance">₦0.00</div> <!-- Primary currency -->
-      <div class="balances-row" id="allBalances"> <!-- NEW: Show all 3 -->
-        <span>NGN: <strong id="balNGN">₦0</strong></span>
-        <span>GHS: <strong id="balGHS">GH₵0</strong></span>
-        <span>KES: <strong id="balKES">KSh0</strong></span>
+      <div class="balance-label">Available Balances</div>
+      <div class="balance-amount" id="userBalance">₦0.00</div>
+      <div class="balances-row" id="allBalances">
+        <span>NGN: <strong id="balNGN">₦0.00</strong></span>
+        <span>GHS: <strong id="balGHS">GH₵0.00</strong></span>
+        <span>KES: <strong id="balKES">KSh0.00</strong></span>
       </div>
       <div class="wallet-id" id="walletId">Wallet ID: Loading...</div>
     </div>
@@ -303,7 +292,6 @@
     </div>
   </div>
 
-  <!-- SEND MONEY MODAL - PHASE 4A -->
   <div id="sendModal" class="modal hidden">
     <div class="modal-content">
       <h2>Send Money</h2>
@@ -317,20 +305,11 @@
     </div>
   </div>
 
-  <script src="https://js.paystack.co/v1/inline.js"></script>
-
-  <script>
-    // =========================
-    // 1. CONFIG & STATE
-    // =========================
+  <script src="https://js.paystack.co/v1/inline.js"></script>  <script>
     const API_URL = '';
     const TOKEN_KEY = 'creativepay_token';
     let currentUser = null;
-    let authCheckTimeout = null;
 
-    // =========================
-    // 2. HELPERS
-    // =========================
     const getToken = () => localStorage.getItem(TOKEN_KEY);
     const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
     const clearToken = () => localStorage.removeItem(TOKEN_KEY);
@@ -385,15 +364,11 @@
       document.getElementById('bvnForm').classList.remove('hidden');
     };
 
-    // UX FIX: Return to dashboard from History
     function closeHistory() {
       document.getElementById('transactionsCard').style.display = 'none';
       loadDashboard();
     }
 
-    // =========================
-    // 3. API CALLS WITH TIMEOUT
-    // =========================
     async function apiCall(endpoint, options = {}) {
       const token = getToken();
       const controller = new AbortController();
@@ -401,11 +376,11 @@
 
       try {
         const res = await fetch(`${API_URL}${endpoint}`, {
-          ...options,
+         ...options,
           headers: {
             'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` }),
-            ...options.headers
+           ...(token && { 'Authorization': `Bearer ${token}` }),
+           ...options.headers
           },
           signal: controller.signal
         });
@@ -429,15 +404,12 @@
       }
     }
 
-    // =========================
-    // 4. AUTH FLOW
-    // =========================
     async function handleLogin() {
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
       const btn = document.getElementById('loginBtn');
 
-      if (!email || !password) {
+      if (!email ||!password) {
         showError('loginError', 'Email and password required');
         return;
       }
@@ -467,7 +439,7 @@
       const password = document.getElementById('registerPassword').value;
       const btn = document.getElementById('registerBtn');
 
-      if (!fullName || !email || !password) {
+      if (!fullName ||!email ||!password) {
         showError('registerError', 'All fields required');
         return;
       }
@@ -500,7 +472,7 @@
       const bvn = document.getElementById('bvnInput').value.trim();
       const btn = document.getElementById('bvnBtn');
 
-      if (!bvn || bvn.length !== 11 || !/^\d+$/.test(bvn)) {
+      if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
         showError('bvnError', 'BVN must be 11 digits');
         return;
       }
@@ -528,12 +500,7 @@
       currentUser = null;
       showAuth();
       showLogin();
-    }
-
-    // =========================
-    // 5. DASHBOARD - 4B UPGRADE
-    // =========================
-    async function loadDashboard(user = null) {
+    }    async function loadDashboard(user = null) {
       showLoader();
 
       try {
@@ -547,21 +514,20 @@
         document.getElementById('userEmail').textContent = user.email || 'N/A';
         document.getElementById('userName').textContent = user.fullName || 'CreativePay User';
 
-        // 4B: Show all balances
+        // 4B: NO MORE UNDEFINED. Safe fallback to 0.00
         const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
         const active = user.activeCurrency || 'NGN';
-        
+
         document.getElementById('balNGN').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
         document.getElementById('balGHS').textContent = `GH₵${Number(balances.GHS || 0).toFixed(2)}`;
         document.getElementById('balKES').textContent = `KSh${Number(balances.KES || 0).toFixed(2)}`;
-        
-        // Main balance shows active currency
+
         const mainBalance = balances[active] || 0;
-        const symbol = active === 'NGN' ? '₦' : active === 'GHS' ? 'GH₵' : 'KSh';
+        const symbol = active === 'NGN'? '₦' : active === 'GHS'? 'GH₵' : 'KSh';
         document.getElementById('userBalance').textContent = `${symbol}${Number(mainBalance).toFixed(2)}`;
 
         document.getElementById('walletId').textContent = user.walletId 
-          ? `Wallet ID: ${user.walletId}` 
+         ? `Wallet ID: ${user.walletId}` 
           : 'Wallet ID: Complete KYC to activate';
 
         const kycBadge = document.getElementById('kycBadge');
@@ -578,10 +544,11 @@
           return;
         }
 
-                document.getElementById('outputWindow').textContent = 
+        // FIXED: No more undefined in System Status
+        document.getElementById('outputWindow').textContent = 
           `✅ Connected to CreativePay Phase 4B\n` +
           `User: ${user.email}\n` +
-          `Balances: NGN ₦${balances.NGN} | GHS GH₵${balances.GHS} | KES KSh${balances.KES}\n` +
+          `Balances: NGN ₦${Number(balances.NGN || 0).toFixed(2)} | GHS GH₵${Number(balances.GHS || 0).toFixed(2)} | KES KSh${Number(balances.KES || 0).toFixed(2)}\n` +
           `Active: ${active}\n` +
           `Wallet: ${user.walletId || 'Pending'}\n` +
           `KYC: Tier ${user.kycTier}`;
@@ -592,9 +559,7 @@
         handleLogout();
       }
     }
-    // =========================
-    // 6. FUND WALLET - 4B UPGRADE
-    // =========================
+
     function fundWallet() {
       if (!currentUser ||!currentUser.id) {
         alert('Please wait, loading account...');
@@ -605,7 +570,6 @@
         return;
       }
 
-      // 4B: Currency selection modal
       const currency = prompt("Select currency to fund:\n1 = NGN ₦\n2 = GHS GH₵\n3 = KES KSh", "1");
       let selectedCurrency = 'NGN';
       if (currency === '2') selectedCurrency = 'GHS';
@@ -613,7 +577,7 @@
 
       const symbol = selectedCurrency === 'NGN'? '₦' : selectedCurrency === 'GHS'? 'GH₵' : 'KSh';
       let amount = prompt(`Enter amount to fund (${symbol}):`, "1000");
-      
+
       if (!amount || isNaN(amount) || Number(amount) < 100) {
         alert(`Minimum funding amount is ${symbol}100`);
         return;
@@ -623,7 +587,6 @@
       fundBtn.disabled = true;
       fundBtn.textContent = 'Opening Paystack...';
 
-      // Convert to NGN for Paystack. Paystack only takes NGN
       const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
       const amountNGN = Math.ceil(Number(amount) / RATES[selectedCurrency]);
 
@@ -631,12 +594,12 @@
         key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         email: currentUser.email,
         amount: amountNGN * 100,
-        currency: 'NGN', // Paystack is NGN only
+        currency: 'NGN',
         ref: 'CPY-FUND-' + Date.now() + '-' + currentUser.id.slice(-4),
         metadata: { 
           user_id: currentUser.id,
           userId: currentUser.id,
-          fund_currency: selectedCurrency, // Send target currency to backend
+          fund_currency: selectedCurrency,
           fund_amount: Number(amount)
         },
         onClose: function(){
@@ -658,7 +621,7 @@
       try {
         const data = await apiCall('/api/fund-wallet/verify', {
           method: 'POST',
-          body: JSON.stringify({ reference, currency }) // 4B: Send currency
+          body: JSON.stringify({ reference, currency })
         });
 
         const symbol = currency === 'NGN'? '₦' : currency === 'GHS'? 'GH₵' : 'KSh';
@@ -671,9 +634,7 @@
         fundBtn.textContent = '+ Fund Wallet';
       }
     }
-    // =========================
-    // 7. SEND MONEY - PHASE 4A
-    // =========================
+
     function openSendModal() {
       if (currentUser.kycTier < 1) {
         alert('Complete BVN verification to send money');
@@ -690,7 +651,7 @@
     function closeSendModal() {
       document.getElementById('sendModal').classList.add('hidden');
     } 
-    
+
     async function handleTransfer() {
       const recipient = document.getElementById('sendRecipient').value.trim();
       const amount = document.getElementById('sendAmount').value;
@@ -705,8 +666,7 @@
         showError('sendError', 'Minimum transfer is ₦10');
         return;
       }
-      
-      // 4B: Check balance in active currency
+
       const active = currentUser.activeCurrency || 'NGN';
       if (Number(amount) > (currentUser.balances?.[active] || 0)) {
         showError('sendError', `Insufficient ${active} balance`);
@@ -723,7 +683,7 @@
         });
 
         showSuccess('sendSuccess', data.message);
-        currentUser.balances = data.balances; // Update local state
+        currentUser.balances = data.balances;
         setTimeout(() => {
           closeSendModal();
           loadDashboard();
@@ -735,9 +695,6 @@
       }
     }
 
-    // =========================
-    // 8. TRANSACTIONS
-    // =========================
     async function loadTransactions() {
       try {
         const data = await apiCall('/api/transactions');
@@ -767,9 +724,6 @@
       }
     }
 
-    // =========================
-    // 9. INIT
-    // =========================
     window.addEventListener('DOMContentLoaded', async () => {
       const token = getToken();
       if (token) {
