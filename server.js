@@ -127,6 +127,7 @@ const authMiddleware = async (req, res, next) => {
 // =========================
 // 6. HELPER: BUILD USER RESPONSE - 4B UPGRADE
 // =========================
+//
 const buildUserResponse = async (user) => {
   try {
     const userObjectId = new mongoose.Types.ObjectId(user._id);
@@ -134,11 +135,21 @@ const buildUserResponse = async (user) => {
 
     if (wallet && (!wallet.walletId || wallet.walletId === '')) {
       wallet.walletId = `CPY-${Date.now()}-${user._id.toString().slice(-4)}`;
+    }
+
+    // PHASE 4B FIX: Auto-seed missing balances for old accounts
+    if (wallet && (!wallet.balances || wallet.balances.size === 0)) {
+      wallet.balances = new Map([
+        ['NGN', wallet.balance || 0], // Migrate old balance
+        ['GHS', 0], 
+        ['KES', 0]
+      ]);
+      wallet.currency = wallet.currency || 'NGN';
       await wallet.save();
     }
 
     // Convert Map to Object for JSON
-    const balances = wallet?.balances? Object.fromEntries(wallet.balances) : { NGN: 0 };
+    const balances = wallet?.balances? Object.fromEntries(wallet.balances) : { NGN: 0, GHS: 0, KES: 0 };
     const activeCurrency = wallet?.currency || 'NGN';
 
     return {
@@ -147,7 +158,7 @@ const buildUserResponse = async (user) => {
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
-      balances, // { NGN: 650, GHS: 0, KES: 0 }
+      balances, // { NGN: 0, GHS: 0, KES: 0 }
       activeCurrency,
       walletId: wallet?.walletId || null,
       createdAt: user.createdAt
@@ -160,14 +171,13 @@ const buildUserResponse = async (user) => {
       fullName: user.fullName,
       kycTier: user.kycTier,
       kycStatus: user.kycStatus,
-      balances: { NGN: 0 },
+      balances: { NGN: 0, GHS: 0, KES: 0 },
       activeCurrency: 'NGN',
       walletId: null,
       createdAt: user.createdAt
     };
   }
 };
-
 // =========================
 // 7. API ROUTES
 // =========================
