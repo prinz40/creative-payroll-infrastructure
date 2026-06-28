@@ -12,6 +12,15 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
+// 1. ADD THIS HOMEPAGE ROUTE RIGHT HERE 👇
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'LIVE ✅', 
+    message: 'CreativePay API is running',
+    docs: '/api/login, /api/register, /api/me' 
+  });
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 const MONGO_URI = process.env.MONGO_URI;
@@ -112,7 +121,7 @@ app.get('/api/banks', auth, async (req, res) => {
   const { currency } = req.query;
   if (currency !== 'NGN') return res.json({ banks: [] });
   const banks = await axios.get('https://api.paystack.co/bank', { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
-  res.json({ banks: banks.data.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) });
+  res.json({ banks: banks.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) });
 });
 
 app.post('/api/withdraw', auth, async (req, res) => {
