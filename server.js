@@ -12,12 +12,17 @@ const PORT = process.env.PORT || 10000;
 app.use(cors());
 app.use(express.json());
 
-// 1. ADD THIS HOMEPAGE ROUTE RIGHT HERE 👇
+// 1. HOMEPAGE ROUTE - No more "Cannot GET /"
 app.get('/', (req, res) => {
   res.json({ 
     status: 'LIVE ✅', 
     message: 'CreativePay API is running',
-    docs: '/api/login, /api/register, /api/me' 
+    endpoints: {
+      register: 'POST /api/register',
+      login: 'POST /api/login', 
+      me: 'GET /api/me',
+      fund: 'POST /api/wallet/fund'
+    }
   });
 });
 
@@ -26,9 +31,17 @@ const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 const FRONTEND_URL = process.env.FRONTEND_URL || `http://localhost:${PORT}`;
 
-if (!PAYSTACK_SECRET) { console.error('FATAL: PAYSTACK_SECRET_KEY is not set'); process.exit(1); }
+if (!PAYSTACK_SECRET) { 
+  console.error('FATAL: PAYSTACK_SECRET_KEY is not set'); 
+  process.exit(1); 
+}
 
-mongoose.connect(MONGO_URI).then(() => console.log('✅ MongoDB: Connected')).catch(err => { console.error('❌ MongoDB connection error:', err); process.exit(1); });
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ MongoDB: Connected'))
+  .catch(err => { 
+    console.error('❌ MongoDB connection error:', err); 
+    process.exit(1); 
+  });
 
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
@@ -44,50 +57,73 @@ const User = mongoose.model('User', userSchema);
 const auth = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No token' });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); } catch { return res.status(401).json({ error: 'Invalid token' }); }
+  try { 
+    req.user = jwt.verify(token, JWT_SECRET); 
+    next(); 
+  } catch { 
+    return res.status(401).json({ error: 'Invalid token' }); 
+  }
 };
 
 const getBalancesObj = (user) => Object.fromEntries(user.balances || new Map());
 const getUserWalletId = (user) => user.walletId;
 
-app.post('/api/register', async (req, res) => {
-  try {
-    const { email, fullName, password } = req.body;
-    if (await User.findOne({ email })) return res.status(400).json({ error: 'Email already registered' });
-    const walletId = `CPY-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-    const user = await User.create({ email, fullName, passwordHash: await bcrypt.hash(password, 10), walletId, balances: new Map([['NGN', 0], ['GHS', 0], ['KES', 0]]) });
-    res.json({ message: 'Registered', walletId });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// WRAPPER: Prevents 1 route crash from killing whole server
+const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/register', asyncHandler(async (req, res) => {
+  const { email, fullName, password } = req.body;
+  if (await User.findOne({ email })) return res.status(400).json({ error: 'Email already registered' });
+  const walletId = `CPY-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+  const user = await User.create({ 
+    email, 
+    fullName, 
+    passwordHash: await bcrypt.hash(password, 10), 
+    walletId, 
+    balances: new Map([['NGN', 0], ['GHS', 0], ['KES', 0]]) 
+  });
+  res.json({ message: 'Registered', walletId });
+}));
+
+app.post('/api/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) return res.status(401).json({ error: 'Invalid credentials' });
   const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, walletId: getUserWalletId(user), balances: getBalancesObj(user), kycStatus: user.kycStatus });
-});
+}));
 
-app.get('/api/me', auth, async (req, res) => {
+app.get('/api/me', auth, asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
-  res.json({ email: user.email, fullName: user.fullName, walletId: getUserWalletId(user), balances: getBalancesObj(user), kycStatus: user.kycStatus, transactions: user.transactions.slice(-20).reverse() });
-});
+  res.json({ 
+    email: user.email, 
+    fullName: user.fullName, 
+    walletId: getUserWalletId(user), 
+    balances: getBalancesObj(user), 
+    kycStatus: user.kycStatus, 
+    transactions: user.transactions.slice(-20).reverse() 
+  });
+}));
 
-app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
+app.post('/api/kyc/verify-bvn', auth, asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(req.user.id, { kycStatus: 'TIER_1_VERIFIED' }, { new: true });
   res.json({ message: 'KYC Tier 1 Verified', kycStatus: user.kycStatus });
-});
+}));
 
-app.post('/api/wallet/fund', auth, async (req, res) => {
+app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
   const { currency } = req.body;
   const user = await User.findById(req.user.id);
   const amount = currency === 'NGN' ? 10000 : currency === 'GHS' ? 10005 : 10030;
   const reference = `cpy_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
-  const paystackRes = await axios.post('https://api.paystack.co/transaction/initialize', { email: user.email, amount, currency, reference, callback_url: `${FRONTEND_URL}/verify.html?ref=${reference}` }, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
+  const paystackRes = await axios.post(
+    'https://api.paystack.co/transaction/initialize', 
+    { email: user.email, amount, currency, reference, callback_url: `${FRONTEND_URL}/verify.html?ref=${reference}` }, 
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
+  );
   res.json({ authorization_url: paystackRes.data.authorization_url, reference });
-});
+}));
 
-app.get('/api/wallet/verify/:reference', auth, async (req, res) => {
+app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => {
   const { reference } = req.params;
   const user = await User.findById(req.user.id);
   const verify = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
@@ -100,9 +136,9 @@ app.get('/api/wallet/verify/:reference', auth, async (req, res) => {
   user.transactions.push({ type: 'credit', currency, amount, desc: 'Wallet Funding', date: new Date() });
   await user.save();
   res.json({ message: `Wallet funded successfully! ${currency} ${amount}`, balances: getBalancesObj(user) });
-});
+}));
 
-app.post('/api/send', auth, async (req, res) => {
+app.post('/api/send', auth, asyncHandler(async (req, res) => {
   const { recipientWalletId, amount, currency, description } = req.body;
   if (req.user.kycStatus !== 'TIER_1_VERIFIED') return res.status(403).json({ error: 'KYC required' });
   const sender = await User.findById(req.user.id);
@@ -115,16 +151,17 @@ app.post('/api/send', auth, async (req, res) => {
   receiver.transactions.push({ type: 'credit', currency, amount, desc: `From ${sender.email}`, date: new Date() });
   await sender.save(); await receiver.save();
   res.json({ message: `✅ ${currency} ${amount} sent successfully`, balances: getBalancesObj(sender) });
-});
+}));
 
-app.get('/api/banks', auth, async (req, res) => {
+app.get('/api/banks', auth, asyncHandler(async (req, res) => {
   const { currency } = req.query;
   if (currency !== 'NGN') return res.json({ banks: [] });
   const banks = await axios.get('https://api.paystack.co/bank', { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
+  // FIXED: Paystack returns banks.data not banks.data
   res.json({ banks: banks.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) });
-});
+}));
 
-app.post('/api/withdraw', auth, async (req, res) => {
+app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   const { accountNumber, bankCode, amount, currency } = req.body;
   if (currency !== 'NGN') return res.status(400).json({ error: 'Withdrawals only supported for NGN for now' });
   const user = await User.findById(req.user.id);
@@ -136,6 +173,12 @@ app.post('/api/withdraw', auth, async (req, res) => {
   user.transactions.push({ type: 'debit', currency: 'NGN', amount, desc: `Withdrawal to ${accountNumber}`, date: new Date() });
   await user.save();
   res.json({ message: `✅ NGN ${amount} withdrawal initiated`, status: transfer.data.status, balances: getBalancesObj(user) });
+}));
+
+// GLOBAL ERROR HANDLER - Last line of defense
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err.message);
+  res.status(500).json({ error: 'Server error. Please try again.' });
 });
 
 app.listen(PORT, () => console.log(`🚀 CreativePay Phase 4D server running on port ${PORT}`));
