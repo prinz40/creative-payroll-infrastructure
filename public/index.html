@@ -304,9 +304,9 @@
       <div class="link" onclick="closeSendModal()">Cancel</div>
     </div>
   </div>
-
-  <script src="https://js.paystack.co/v1/inline.js"></script>  <script>
-    const API_URL = '';
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script>
+    const API_URL = 'https://creativepay-backend.onrender.com'; // <-- CHANGE THIS TO YOUR URL
     const TOKEN_KEY = 'creativepay_token';
     let currentUser = null;
 
@@ -395,7 +395,7 @@
         }
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Request failed');
+        if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
         return data;
       } catch (error) {
         clearTimeout(timeout);
@@ -424,7 +424,7 @@
         });
 
         setToken(data.token);
-        await loadDashboard(data.user);
+        await loadDashboard();
       } catch (error) {
         showError('loginError', error.message);
       } finally {
@@ -452,14 +452,13 @@
       btn.textContent = 'Creating account...';
 
       try {
-        const data = await apiCall('/api/register', {
+        await apiCall('/api/register', {
           method: 'POST',
           body: JSON.stringify({ fullName, email, password })
         });
-
-        setToken(data.token);
         showAuth();
-        showBVN();
+        showLogin();
+        showError('loginError', 'Registered! Please login now.');
       } catch (error) {
         showError('registerError', error.message);
       } finally {
@@ -481,13 +480,11 @@
       btn.textContent = 'Verifying...';
 
       try {
-        const data = await apiCall('/api/bvn', {
-          method: 'POST',
-          body: JSON.stringify({ bvn })
+        await apiCall('/api/kyc/verify-bvn', {
+          method: 'POST'
         });
-
         showSuccess('bvnSuccess', 'BVN verified! Loading dashboard...');
-        setTimeout(() => loadDashboard(data.user), 1500);
+        setTimeout(() => loadDashboard(), 1500);
       } catch (error) {
         showError('bvnError', error.message);
         btn.disabled = false;
@@ -500,38 +497,26 @@
       currentUser = null;
       showAuth();
       showLogin();
-    }    async function loadDashboard(user = null) {
-      showLoader();
+    }
 
+    async function loadDashboard() {
+      showLoader();
       try {
-        if (!user) {
-          const data = await apiCall('/api/user');
-          user = data.user;
-        }
+        const user = await apiCall('/api/me');
 
         currentUser = user;
-
         document.getElementById('userEmail').textContent = user.email || 'N/A';
         document.getElementById('userName').textContent = user.fullName || 'CreativePay User';
 
-        // 4B: NO MORE UNDEFINED. Safe fallback to 0.00
         const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
-        const active = user.activeCurrency || 'NGN';
-
         document.getElementById('balNGN').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
         document.getElementById('balGHS').textContent = `GH₵${Number(balances.GHS || 0).toFixed(2)}`;
         document.getElementById('balKES').textContent = `KSh${Number(balances.KES || 0).toFixed(2)}`;
-
-        const mainBalance = balances[active] || 0;
-        const symbol = active === 'NGN'? '₦' : active === 'GHS'? 'GH₵' : 'KSh';
-        document.getElementById('userBalance').textContent = `${symbol}${Number(mainBalance).toFixed(2)}`;
-
-        document.getElementById('walletId').textContent = user.walletId 
-         ? `Wallet ID: ${user.walletId}` 
-          : 'Wallet ID: Complete KYC to activate';
+        document.getElementById('userBalance').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
+        document.getElementById('walletId').textContent = `Wallet ID: ${user.walletId}`;
 
         const kycBadge = document.getElementById('kycBadge');
-        if (user.kycTier >= 1) {
+        if (user.kycStatus === 'TIER_1_VERIFIED') {
           kycBadge.textContent = 'KYC TIER 1 VERIFIED';
           kycBadge.className = 'kyc-badge kyc-verified';
           document.getElementById('kycBanner').style.display = 'block';
@@ -544,14 +529,12 @@
           return;
         }
 
-        // FIXED: No more undefined in System Status
         document.getElementById('outputWindow').textContent = 
-          `✅ Connected to CreativePay Phase 4B\n` +
+          `✅ Connected to CreativePay Phase 4D v1.3.3\n` +
           `User: ${user.email}\n` +
           `Balances: NGN ₦${Number(balances.NGN || 0).toFixed(2)} | GHS GH₵${Number(balances.GHS || 0).toFixed(2)} | KES KSh${Number(balances.KES || 0).toFixed(2)}\n` +
-          `Active: ${active}\n` +
-          `Wallet: ${user.walletId || 'Pending'}\n` +
-          `KYC: Tier ${user.kycTier}`;
+          `Wallet: ${user.walletId}\n` +
+          `KYC: ${user.kycStatus}`;
 
         showDashboard();
       } catch (error) {
@@ -561,91 +544,31 @@
     }
 
     function fundWallet() {
-      if (!currentUser ||!currentUser.id) {
-        alert('Please wait, loading account...');
-        return;
-      }
-      if (currentUser.kycTier < 1) {
+      if (currentUser.kycStatus!== 'TIER_1_VERIFIED') {
         alert('Please complete BVN verification first.');
         return;
       }
-
       const currency = prompt("Select currency to fund:\n1 = NGN ₦\n2 = GHS GH₵\n3 = KES KSh", "1");
       let selectedCurrency = 'NGN';
       if (currency === '2') selectedCurrency = 'GHS';
       if (currency === '3') selectedCurrency = 'KES';
 
-      const symbol = selectedCurrency === 'NGN'? '₦' : selectedCurrency === 'GHS'? 'GH₵' : 'KSh';
-      let amount = prompt(`Enter amount to fund (${symbol}):`, "1000");
-
-      if (!amount || isNaN(amount) || Number(amount) < 100) {
-        alert(`Minimum funding amount is ${symbol}100`);
-        return;
-      }
-
-      const fundBtn = document.getElementById('fundBtn');
-      fundBtn.disabled = true;
-      fundBtn.textContent = 'Opening Paystack...';
-
-      const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
-      const amountNGN = Math.ceil(Number(amount) / RATES[selectedCurrency]);
-
-      let handler = PaystackPop.setup({
-        key: 'pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
-        email: currentUser.email,
-        amount: amountNGN * 100,
-        currency: 'NGN',
-        ref: 'CPY-FUND-' + Date.now() + '-' + currentUser.id.slice(-4),
-        metadata: { 
-          user_id: currentUser.id,
-          userId: currentUser.id,
-          fund_currency: selectedCurrency,
-          fund_amount: Number(amount)
-        },
-        onClose: function(){
-          alert('Payment cancelled');
-          fundBtn.disabled = false;
-          fundBtn.textContent = '+ Fund Wallet';
-        },
-        callback: function(response){
-          verifyPayment(response.reference, selectedCurrency);
-        }
-      });
-      handler.openIframe();
-    }
-
-    async function verifyPayment(reference, currency = 'NGN') {
-      const fundBtn = document.getElementById('fundBtn');
-      fundBtn.textContent = 'Verifying...';
-
-      try {
-        const data = await apiCall('/api/fund-wallet/verify', {
-          method: 'POST',
-          body: JSON.stringify({ reference, currency })
-        });
-
-        const symbol = currency === 'NGN'? '₦' : currency === 'GHS'? 'GH₵' : 'KSh';
-        alert(`✅ Wallet funded successfully!\n${currency} ${data.amount.toFixed(2)} added\nNew ${currency} Balance: ${symbol}${data.balances[currency].toFixed(2)}`);
-        loadDashboard();
-      } catch (error) {
-        alert('Payment verification failed: ' + error.message);
-      } finally {
-        fundBtn.disabled = false;
-        fundBtn.textContent = '+ Fund Wallet';
-      }
+      apiCall('/api/wallet/fund', {
+        method: 'POST',
+        body: JSON.stringify({ currency: selectedCurrency })
+      }).then(data => {
+        window.location.href = data.authorization_url;
+      }).catch(err => alert(err.message));
     }
 
     function openSendModal() {
-      if (currentUser.kycTier < 1) {
+      if (currentUser.kycStatus!== 'TIER_1_VERIFIED') {
         alert('Complete BVN verification to send money');
         return;
       }
       document.getElementById('sendModal').classList.remove('hidden');
       document.getElementById('sendError').classList.add('hidden');
       document.getElementById('sendSuccess').classList.add('hidden');
-      document.getElementById('sendRecipient').value = '';
-      document.getElementById('sendAmount').value = '';
-      document.getElementById('sendDesc').value = '';
     }
 
     function closeSendModal() {
@@ -653,23 +576,12 @@
     } 
 
     async function handleTransfer() {
-      const recipient = document.getElementById('sendRecipient').value.trim();
-      const amount = document.getElementById('sendAmount').value;
-      const description = document.getElementById('sendDesc').value.trim();
+      const recipientWalletId = document.getElementById('sendRecipient').value.trim();
+      const amount = Number(document.getElementById('sendAmount').value);
       const btn = document.getElementById('sendBtn');
 
-      if (!recipient ||!amount) {
+      if (!recipientWalletId ||!amount) {
         showError('sendError', 'Recipient and amount required');
-        return;
-      }
-      if (Number(amount) < 10) {
-        showError('sendError', 'Minimum transfer is ₦10');
-        return;
-      }
-
-      const active = currentUser.activeCurrency || 'NGN';
-      if (Number(amount) > (currentUser.balances?.[active] || 0)) {
-        showError('sendError', `Insufficient ${active} balance`);
         return;
       }
 
@@ -677,17 +589,12 @@
       btn.textContent = 'Sending...';
 
       try {
-        const data = await apiCall('/api/transfer', {
+        const data = await apiCall('/api/send', {
           method: 'POST',
-          body: JSON.stringify({ recipient, amount: Number(amount), description, currency: active })
+          body: JSON.stringify({ recipientWalletId, amount, currency: 'NGN' })
         });
-
         showSuccess('sendSuccess', data.message);
-        currentUser.balances = data.balances;
-        setTimeout(() => {
-          closeSendModal();
-          loadDashboard();
-        }, 2000);
+        setTimeout(() => { closeSendModal(); loadDashboard(); }, 2000);
       } catch (error) {
         showError('sendError', error.message);
         btn.disabled = false;
@@ -697,27 +604,27 @@
 
     async function loadTransactions() {
       try {
-        const data = await apiCall('/api/transactions');
+        const user = await apiCall('/api/me');
         const list = document.getElementById('transactionsList');
+        const transactions = user.transactions || [];
 
-        if (data.transactions.length === 0) {
+        if (transactions.length === 0) {
           list.innerHTML = '<p style="text-align:center;color:#64748b;">No transactions yet</p>';
         } else {
-          list.innerHTML = data.transactions.map(tx => {
+          list.innerHTML = transactions.map(tx => {
             const symbol = tx.currency === 'NGN'? '₦' : tx.currency === 'GHS'? 'GH₵' : 'KSh';
             return `
             <div class="tx-row">
               <div>
-                <div>${tx.description || tx.type} ${tx.currency? `(${tx.currency})` : ''}</div>
-                <div class="tx-date">${new Date(tx.createdAt).toLocaleString()}</div>
+                <div>${tx.desc || tx.type} ${tx.currency? `(${tx.currency})` : ''}</div>
+                <div class="tx-date">${new Date(tx.date).toLocaleString()}</div>
               </div>
-              <div class="${tx.amount > 0? 'tx-credit' : 'tx-debit'}">
-                ${tx.amount > 0? '+' : ''}${symbol}${Math.abs(tx.amount).toFixed(2)}
+              <div class="${tx.type === 'credit'? 'tx-credit' : 'tx-debit'}">
+                ${tx.type === 'credit'? '+' : '-'}${symbol}${Math.abs(tx.amount).toFixed(2)}
               </div>
             </div>
           `}).join('');
         }
-
         document.getElementById('transactionsCard').style.display = 'block';
       } catch (error) {
         showError('sendError', 'Failed to load transactions');
@@ -736,6 +643,7 @@
         }, 1000);
       }
     });
-  </script>
+</script>
 </body>
 </html>
+  
