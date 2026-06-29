@@ -55,7 +55,7 @@ const auth = (req, res, next) => {
 const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 app.get('/', (req, res) => {
-  res.json({ status: 'LIVE', message: 'CreativePay API Phase 4D', version: 'v1.3.1' });
+  res.json({ status: 'LIVE', message: 'CreativePay API Phase 4D', version: 'v1.3.3' });
 });
 
 app.post('/api/register', asyncHandler(async (req, res) => {
@@ -94,9 +94,9 @@ app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
   const response = await axios.post(
     'https://api.paystack.co/transaction/initialize', 
     { email: user.email, amount, currency, reference, callback_url: `${FRONTEND_URL}/verify.html?ref=${reference}` }, 
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } // ) } = 2 brackets closed
   );
-  res.json({ authorization_url: response.data.authorization_url, reference }); // FIXED:.data.data
+  res.json({ authorization_url: response.data.authorization_url, reference });
 }));
 
 app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => {
@@ -142,22 +142,22 @@ app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   if ((user.balances.NGN || 0) < amount) return res.status(400).json({ error: 'Insufficient NGN balance' });
   const recipientRes = await axios.post('https://api.paystack.co/transferrecipient', 
     { type: 'nuban', name: user.fullName, account_number: accountNumber, bank_code: bankCode, currency: 'NGN' }, 
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } // ) } = 2 brackets closed
   );
   const transferRes = await axios.post('https://api.paystack.co/transfer', 
-    { source: 'balance', amount: amount * 100, recipient: recipientRes.data.recipient_code, reason: 'CreativePay Withdrawal' }, // FIXED:.data.data
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
+    { source: 'balance', amount: amount * 100, recipient: recipientRes.data.recipient_code, reason: 'CreativePay Withdrawal' }, 
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } // ) } = 2 brackets closed
   );
-  if (transferRes.data.status!== 'success' && transferRes.data.status!== 'pending') // FIXED:.data.data
+  if (transferRes.data.status!== 'success' && transferRes.data.status!== 'pending') 
     return res.status(400).json({ error: 'Transfer failed' });
   user.balances.NGN -= amount;
   user.transactions.push({ type: 'debit', currency: 'NGN', amount, desc: `Withdrawal to ${accountNumber}`, date: new Date() });
   await user.save();
-  res.json({ message: `NGN ${amount} withdrawal initiated`, status: transferRes.data.status, balances: user.balances }); // FIXED:.data.data
-});
+  res.json({ message: `NGN ${amount} withdrawal initiated`, status: transferRes.data.status, balances: user.balances });
+})); // ) = closes asyncHandler + app.post
 
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.stack);
   res.status(500).json({ error: 'Server error. Please try again.' });
 });
-app.listen(PORT, () => console.log(`🚀 CreativePay Phase 4D v1.3.1 server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 CreativePay Phase 4D v1.3.3 server running on port ${PORT}`));
