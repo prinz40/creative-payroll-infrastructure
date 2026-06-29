@@ -1,649 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      background: #0f172a; 
-      color: #e2e8f0; 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      min-height: 100vh;
-    }
-   .container {
-      background: #1e293b;
-      padding: 30px;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 400px;
-      border: 1px solid #334155;
-      margin: 20px auto;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    }
-   .dashboard-container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    h1 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 24px; }
-    h2 { text-align: center; margin-bottom: 20px; }
-    h3 { margin-bottom: 16px; }
-   .kyc-warning {
-      background: #854d0e;
-      color: #facc15;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 20px;
-      font-size: 14px;
-      text-align: center;
-    }
-   .kyc-banner {
-      background: #166534; 
-      color: #4ade80; 
-      padding: 12px;
-      border-radius: 8px; 
-      text-align: center; 
-      font-weight: 600;
-      margin-bottom: 20px;
-    }
-    input, select {
-      width: 100%;
-      padding: 12px;
-      margin: 8px 0;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      color: #e2e8f0;
-      font-size: 16px;
-    }
-    input:focus, select:focus { outline: none; border-color: #38bdf8; }
-    button {
-      width: 100%;
-      padding: 12px;
-      background: #2563eb;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      font-size: 16px;
-      cursor: pointer;
-      margin-top: 12px;
-      font-weight: 600;
-    }
-    button:hover { background: #1d4ed8; }
-    button:disabled { background: #475569; cursor: not-allowed; }
-   .link {
-      text-align: center;
-      margin-top: 15px;
-      color: #38bdf8;
-      cursor: pointer;
-      font-size: 14px;
-    }
-   .error {
-      background: #dc2626;
-      color: white;
-      padding: 10px;
-      border-radius: 6px;
-      margin: 10px 0;
-      text-align: center;
-      font-size: 14px;
-    }
-   .success {
-      background: #16a34a;
-      color: white;
-      padding: 10px;
-      border-radius: 6px;
-      margin: 10px 0;
-      text-align: center;
-      font-size: 14px;
-    }
-   .hidden { display: none!important; }
-   .loader { text-align: center; padding: 50px 0; }
-   .spinner { 
-      border: 3px solid #334155; 
-      border-top: 3px solid #38bdf8; 
-      border-radius: 50%; 
-      width: 40px; 
-      height: 40px; 
-      animation: spin 1s linear infinite; 
-      margin: 0 auto 20px; 
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); }
-
-   .header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #334155;
-    }
-   .card {
-      background: #1e293b; padding: 24px; border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-bottom: 20px;
-    }
-   .balance-card { text-align: center; }
-   .balance-label { font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
-   .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
-   .balances-row {
-      display: flex; justify-content: space-around; margin-top: 12px; font-size: 14px;
-    }
-   .balances-row span { color: #94a3b8; }
-   .balances-row strong { color: #e2e8f0; }
-   .wallet-id { font-size: 12px; color: #64748b; margin-top: 8px; font-family: monospace; }
-   .kyc-badge {
-      display: inline-block; padding: 6px 12px; border-radius: 20px;
-      font-size: 12px; font-weight: 600; margin-top: 12px;
-      background: #334155; color: #94a3b8;
-    }
-   .kyc-verified { background: #166534; color: #4ade80; }
-   .user-info { display: flex; justify-content: space-between; margin-bottom: 12px; }
-   .label { color: #94a3b8; font-size: 14px; }
-   .value { font-weight: 600; }
-   .logout-btn {
-      background: #dc2626; color: white; border: none;
-      padding: 8px 16px; border-radius: 6px; cursor: pointer; width: auto;
-    }
-   .logout-btn:hover { background: #b91c1c; }
-   .action-grid {
-      display: grid; gap: 12px; grid-template-columns: 1fr 1fr;
-    }
-    @media (max-width: 600px) {
-     .action-grid { grid-template-columns: 1fr 1fr; }
-    }
-   .action-btn {
-      padding: 12px; border: none; border-radius: 6px; color: white; 
-      cursor: pointer; font-weight: 600; width: 100%;
-    }
-   .fund-btn { background: #2563eb; grid-column: span 2; }
-   .fund-btn:hover { background: #1d4ed8; }
-   .send-btn { background: #16a34a; }
-   .send-btn:hover { background: #15803d; }
-   .history-btn { background: #475569; }
-   .history-btn:hover { background: #334155; }
-   .back-btn {
-      width: auto; padding: 6px 12px; font-size: 12px; background: #475569; margin: 0;
-    }
-   .back-btn:hover { background: #334155; }
-    #outputWindow {
-      background: #0f172a; padding: 16px; border-radius: 8px;
-      font-family: monospace; font-size: 12px; overflow-x: auto;
-      margin-top: 20px; border: 1px solid #334155; white-space: pre-wrap;
-    }
-   .modal {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8); display: flex; align-items: center;
-      justify-content: center; z-index: 1000;
-    }
-   .modal-content {
-      background: #1e293b; padding: 30px; border-radius: 12px;
-      width: 90%; max-width: 400px; border: 1px solid #334155;
-    }
-   .tx-row {
-      display: flex; justify-content: space-between; padding: 12px 0;
-      border-bottom: 1px solid #334155; font-size: 14px;
-    }
-   .tx-credit { color: #4ade80; }
-   .tx-debit { color: #f87171; }
-   .tx-date { color: #64748b; font-size: 12px; }
-   .card-header {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreativePay - Phase 4D v1.3.6</title>
+<style>
+:root{--primary:#1A1A2E;--accent:#0F9D58;--bg:#F5F5F7;--card:#fff;--text:#1A1A2E;--muted:#6B7280}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,system-ui,sans-serif}
+body{background:var(--bg);color:var(--text);padding:20px}
+.container{max-width:420px;margin:0 auto}
+.card{background:var(--card);border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;cursor:pointer;margin-top:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.input{width:100%;padding:14px;border:1px solid #E5E7EB;border-radius:12px;margin-top:8px;font-size:16px}
+.hidden{display:none}
+.tab{display:flex;gap:8px;margin-bottom:16px}
+.tab button{flex:1;padding:12px;border:none;border-radius:12px;background:#E5E7EB;font-weight:600}
+.tab button.active{background:var(--accent);color:#fff}
+.balance{font-size:32px;font-weight:800;color:var(--accent)}
+.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #F3F4F6}
+.kyc-badge{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700}
+.kyc-UNVERIFIED{background:#FEE2E2;color:#991B1B}
+.kyc-TIER_1_VERIFIED{background:#D1FAE5;color:#065F46}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:12px 20px;border-radius:12px;z-index:999;display:none}
+</style>
 </head>
 <body>
-  <div id="loader" class="loader">
-    <div class="spinner"></div>
-    <p>Loading CreativePay...</p>
+<div id="toast" class="toast"></div>
+<div class="container">
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="card">
+    <h2>CreativePay</h2>
+    <p style="color:var(--muted);margin:8px 0 16px">Multi-Currency P2P Wallet</p>
+    <div class="tab">
+      <button id="login-tab" class="active">Login</button>
+      <button id="reg-tab">Register</button>
+    </div>
+    <div id="login-form">
+      <input id="login-email" class="input" placeholder="Email">
+      <input id="login-pass" type="password" class="input" placeholder="Password">
+      <button id="login-btn" class="btn">Login</button>
+    </div>
+    <div id="reg-form" class="hidden">
+      <input id="reg-name" class="input" placeholder="Full Name">
+      <input id="reg-email" class="input" placeholder="Email">
+      <input id="reg-pass" type="password" class="input" placeholder="Password">
+      <button id="reg-btn" class="btn">Create Account</button>
+    </div>
   </div>
 
-  <div id="authContainer" class="container hidden">
-    <h1>CreativePay</h1>
-    <div id="loginForm">
-      <h2>Login</h2>
-      <div id="loginError" class="error hidden"></div>
-      <input type="email" id="loginEmail" placeholder="Email" autocomplete="email" />
-      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
-      <button onclick="handleLogin()" id="loginBtn">Login</button>
-      <div class="link" onclick="showRegister()">Don't have an account? Register</div>
-    </div>
-    <div id="registerForm" class="hidden">
-      <h2>Register</h2>
-      <div id="registerError" class="error hidden"></div>
-      <input type="text" id="registerName" placeholder="Full Name" autocomplete="name" />
-      <input type="email" id="registerEmail" placeholder="Email" autocomplete="email" />
-      <input type="password" id="registerPassword" placeholder="Password (min 6 chars)" autocomplete="new-password" />
-      <button onclick="handleRegister()" id="registerBtn">Register</button>
-      <div class="link" onclick="showLogin()">Already have an account? Login</div>
-    </div>
-    <div id="bvnForm" class="hidden">
-      <div class="kyc-warning">
-        <strong>KYC TIER 1 REQUIRED</strong><br>
-        Verify your BVN to unlock your dashboard and enable transactions.
+  <!-- APP SCREEN -->
+  <div id="app-screen" class="hidden">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div id="user-name" style="font-weight:700"></div>
+          <div id="wallet-id" style="font-size:12px;color:var(--muted)"></div>
+        </div>
+        <span id="kyc-badge" class="kyc-badge">UNVERIFIED</span>
       </div>
-      <h2>BVN Verification</h2>
-      <div id="bvnError" class="error hidden"></div>
-      <div id="bvnSuccess" class="success hidden"></div>
-      <input type="text" id="bvnInput" placeholder="Enter 11-digit BVN" maxlength="11" pattern="[0-9]*" inputmode="numeric" />
-      <button onclick="handleBVN()" id="bvnBtn">Verify BVN</button>
-      <div class="link" onclick="handleLogout()">Logout</div>
-    </div>
-  </div>
-
-  <div id="dashboardContainer" class="dashboard-container hidden">
-    <div class="header">
-      <h1>CreativePay Dashboard</h1>
-      <button class="logout-btn" onclick="handleLogout()">Logout</button>
-    </div>
-
-    <div class="kyc-banner" id="kycBanner" style="display: none;">
-      ✅ KYC TIER 1 VERIFIED - Welcome to CreativePay!
+      <div class="balance" id="balance-ngn">₦0.00</div>
+      <button id="fund-btn" class="btn">Fund Wallet</button>
     </div>
 
     <div class="card">
-      <div class="user-info">
-        <span class="label">Account Email</span>
-        <span class="value" id="userEmail">Loading...</span>
-      </div>
-      <div class="user-info">
-        <span class="label">Full Name</span>
-        <span class="value" id="userName">Loading...</span>
-      </div>
-      <div class="user-info">
-        <span class="label">KYC Status</span>
-        <span class="kyc-badge" id="kycBadge">Checking...</span>
-      </div>
-    </div>
-
-    <div class="card balance-card">
-      <div class="balance-label">Available Balances</div>
-      <div class="balance-amount" id="userBalance">₦0.00</div>
-      <div class="balances-row" id="allBalances">
-        <span>NGN: <strong id="balNGN">₦0.00</strong></span>
-        <span>GHS: <strong id="balGHS">GH₵0.00</strong></span>
-        <span>KES: <strong id="balKES">KSh0.00</strong></span>
-      </div>
-      <div class="wallet-id" id="walletId">Wallet ID: Loading...</div>
+      <h3>Send Money</h3>
+      <input id="send-wallet" class="input" placeholder="Recipient Wallet ID e.g. CPY-ABC123">
+      <input id="send-amount" type="number" class="input" placeholder="Amount NGN">
+      <button id="send-btn" class="btn">Send</button>
     </div>
 
     <div class="card">
-      <h3>Quick Actions</h3>
-      <div class="action-grid">
-        <button onclick="fundWallet()" id="fundBtn" class="action-btn fund-btn">
-          + Fund Wallet
-        </button>
-        <button onclick="openSendModal()" class="action-btn send-btn">
-          Send Money
-        </button>
-        <button onclick="loadTransactions()" class="action-btn history-btn">
-          History
-        </button>
-      </div>
-    </div>
-
-    <div class="card" id="transactionsCard" style="display: none;">
-      <div class="card-header">
-        <h3>Transaction History</h3>
-        <button onclick="closeHistory()" class="back-btn">← Back</button>
-      </div>
-      <div id="transactionsList"></div>
+      <h3>Verify BVN [Tier 1]</h3>
+      <input id="bvn" class="input" placeholder="11-digit BVN">
+      <button id="verify-btn" class="btn">Verify</button>
     </div>
 
     <div class="card">
-      <h3>System Status</h3>
-      <pre id="outputWindow">Connecting...</pre>
+      <h3>Transactions</h3>
+      <div id="tx-list"><div style="color:var(--muted)">No transactions yet</div></div>
     </div>
+    <button id="logout-btn" class="btn" style="background:#EF4444">Logout</button>
   </div>
+</div>
 
-  <div id="sendModal" class="modal hidden">
-    <div class="modal-content">
-      <h2>Send Money</h2>
-      <div id="sendError" class="error hidden"></div>
-      <div id="sendSuccess" class="success hidden"></div>
-      <input type="text" id="sendRecipient" placeholder="Wallet ID (CPY-...) or Email" />
-      <input type="number" id="sendAmount" placeholder="Amount ₦" min="10" step="0.01" />
-      <input type="text" id="sendDesc" placeholder="Description (optional)" />
-      <button onclick="handleTransfer()" id="sendBtn">Send Money</button>
-      <div class="link" onclick="closeSendModal()">Cancel</div>
-    </div>
-  </div>
-<script src="https://js.paystack.co/v1/inline.js"></script>
 <script>
-    const API_URL = 'https://creativepay-backend.onrender.com'; // <-- CHANGE THIS TO YOUR URL
-    const TOKEN_KEY = 'creativepay_token';
-    let currentUser = null;
+// === CONFIG ===
+const API_URL = window.location.origin; // Auto-detects your Render URL. No edits needed.
+let TOKEN = localStorage.getItem('cp_token');
 
-    const getToken = () => localStorage.getItem(TOKEN_KEY);
-    const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
-    const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+// === HELPERS ===
+const $ = id => document.getElementById(id);
+const toast = msg => {
+  const t = $('toast'); t.textContent = msg; t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
+}
+const fmt = n => `₦${Number(n||0).toLocaleString('en-NG',{minimumFractionDigits:2})}`;
 
-    const showError = (id, msg) => {
-      const el = document.getElementById(id);
-      el.textContent = msg;
-      el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 5000);
-    };
+// === UI TOGGLE ===
+function showApp(user){
+  $('auth-screen').classList.add('hidden');
+  $('app-screen').classList.remove('hidden');
+  $('user-name').textContent = user.fullName;
+  $('wallet-id').textContent = user.walletId;
+  $('balance-ngn').textContent = fmt(user.balances.NGN);
+  const badge = $('kyc-badge');
+  badge.textContent = user.kycStatus.replace('_',' ');
+  badge.className = `kyc-badge kyc-${user.kycStatus}`;
+  renderTx(user.transactions);
+}
+function renderTx(txs){
+  const el = $('tx-list');
+  if(!txs||!txs.length) return el.innerHTML='<div style="color:var(--muted)">No transactions yet</div>';
+  el.innerHTML = txs.slice(-5).reverse().map(tx=>`
+    <div class="row">
+      <div>${tx.desc}</div>
+      <div style="color:${tx.type==='credit'?'var(--accent)':'#EF4444'}">
+        ${tx.type==='credit'?'+':'-'}${fmt(tx.amount)}
+      </div>
+    </div>
+  `).join('');
+}
 
-    const showSuccess = (id, msg) => {
-      const el = document.getElementById(id);
-      el.textContent = msg;
-      el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 5000);
-    };
+// === AUTH LOGIC ===
+async function api(path, method='GET', body){
+  const res = await fetch(API_URL+path,{
+    method,
+    headers:{'Content-Type':'application/json',...(TOKEN?{'Authorization':'Bearer '+TOKEN}:{})},
+    body: body?JSON.stringify(body):null
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error||'Request failed');
+  return data;
+}
 
-    const showLoader = () => {
-      document.getElementById('loader').classList.remove('hidden');
-      document.getElementById('authContainer').classList.add('hidden');
-      document.getElementById('dashboardContainer').classList.add('hidden');
-    };
+$('login-tab').onclick=()=>{
+  $('login-tab').classList.add('active');$('reg-tab').classList.remove('active');
+  $('login-form').classList.remove('hidden');$('reg-form').classList.add('hidden');
+}
+$('reg-tab').onclick=()=>{
+  $('reg-tab').classList.add('active');$('login-tab').classList.remove('active');
+  $('reg-form').classList.remove('hidden');$('login-form').classList.add('hidden');
+}
 
-    const showAuth = () => {
-      document.getElementById('loader').classList.add('hidden');
-      document.getElementById('authContainer').classList.remove('hidden');
-      document.getElementById('dashboardContainer').classList.add('hidden');
-    };
-
-    const showDashboard = () => {
-      document.getElementById('loader').classList.add('hidden');
-      document.getElementById('authContainer').classList.add('hidden');
-      document.getElementById('dashboardContainer').classList.remove('hidden');
-    };
-
-    const showLogin = () => {
-      document.getElementById('loginForm').classList.remove('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('bvnForm').classList.add('hidden');
-    };
-
-    const showRegister = () => {
-      document.getElementById('loginForm').classList.add('hidden');
-      document.getElementById('registerForm').classList.remove('hidden');
-      document.getElementById('bvnForm').classList.add('hidden');
-    };
-
-    const showBVN = () => {
-      document.getElementById('loginForm').classList.add('hidden');
-      document.getElementById('registerForm').classList.add('hidden');
-      document.getElementById('bvnForm').classList.remove('hidden');
-    };
-
-    function closeHistory() {
-      document.getElementById('transactionsCard').style.display = 'none';
-      loadDashboard();
-    }
-
-    async function apiCall(endpoint, options = {}) {
-      const token = getToken();
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        const res = await fetch(`${API_URL}${endpoint}`, {
-         ...options,
-          headers: {
-            'Content-Type': 'application/json',
-           ...(token && { 'Authorization': `Bearer ${token}` }),
-           ...options.headers
-          },
-          signal: controller.signal
-        });
-
-        clearTimeout(timeout);
-
-        if (res.status === 401) {
-          clearToken();
-          showAuth();
-          showLogin();
-          throw new Error('Session expired. Please login again.');
-        }
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
-        return data;
-      } catch (error) {
-        clearTimeout(timeout);
-        if (error.name === 'AbortError') throw new Error('Request timeout. Check your connection.');
-        throw error;
-      }
-    }
-
-    async function handleLogin() {
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      const btn = document.getElementById('loginBtn');
-
-      if (!email ||!password) {
-        showError('loginError', 'Email and password required');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Logging in...';
-
-      try {
-        const data = await apiCall('/api/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password })
-        });
-
-        setToken(data.token);
-        await loadDashboard();
-      } catch (error) {
-        showError('loginError', error.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Login';
-      }
-    }
-
-    async function handleRegister() {
-      const fullName = document.getElementById('registerName').value.trim();
-      const email = document.getElementById('registerEmail').value.trim();
-      const password = document.getElementById('registerPassword').value;
-      const btn = document.getElementById('registerBtn');
-
-      if (!fullName ||!email ||!password) {
-        showError('registerError', 'All fields required');
-        return;
-      }
-      if (password.length < 6) {
-        showError('registerError', 'Password must be at least 6 characters');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Creating account...';
-
-      try {
-        await apiCall('/api/register', {
-          method: 'POST',
-          body: JSON.stringify({ fullName, email, password })
-        });
-        showAuth();
-        showLogin();
-        showError('loginError', 'Registered! Please login now.');
-      } catch (error) {
-        showError('registerError', error.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Register';
-      }
-    }
-
-    async function handleBVN() {
-      const bvn = document.getElementById('bvnInput').value.trim();
-      const btn = document.getElementById('bvnBtn');
-
-      if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
-        showError('bvnError', 'BVN must be 11 digits');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Verifying...';
-
-      try {
-        await apiCall('/api/kyc/verify-bvn', {
-          method: 'POST'
-        });
-        showSuccess('bvnSuccess', 'BVN verified! Loading dashboard...');
-        setTimeout(() => loadDashboard(), 1500);
-      } catch (error) {
-        showError('bvnError', error.message);
-        btn.disabled = false;
-        btn.textContent = 'Verify BVN';
-      }
-    }
-
-    function handleLogout() {
-      clearToken();
-      currentUser = null;
-      showAuth();
-      showLogin();
-    }
-
-    async function loadDashboard() {
-      showLoader();
-      try {
-        const user = await apiCall('/api/me');
-
-        currentUser = user;
-        document.getElementById('userEmail').textContent = user.email || 'N/A';
-        document.getElementById('userName').textContent = user.fullName || 'CreativePay User';
-
-        const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
-        document.getElementById('balNGN').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
-        document.getElementById('balGHS').textContent = `GH₵${Number(balances.GHS || 0).toFixed(2)}`;
-        document.getElementById('balKES').textContent = `KSh${Number(balances.KES || 0).toFixed(2)}`;
-        document.getElementById('userBalance').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
-        document.getElementById('walletId').textContent = `Wallet ID: ${user.walletId}`;
-
-        const kycBadge = document.getElementById('kycBadge');
-        if (user.kycStatus === 'TIER_1_VERIFIED') {
-          kycBadge.textContent = 'KYC TIER 1 VERIFIED';
-          kycBadge.className = 'kyc-badge kyc-verified';
-          document.getElementById('kycBanner').style.display = 'block';
-        } else {
-          kycBadge.textContent = 'UNVERIFIED';
-          kycBadge.className = 'kyc-badge';
-          document.getElementById('kycBanner').style.display = 'none';
-          showAuth();
-          showBVN();
-          return;
-        }
-
-        document.getElementById('outputWindow').textContent = 
-          `✅ Connected to CreativePay Phase 4D v1.3.3\n` +
-          `User: ${user.email}\n` +
-          `Balances: NGN ₦${Number(balances.NGN || 0).toFixed(2)} | GHS GH₵${Number(balances.GHS || 0).toFixed(2)} | KES KSh${Number(balances.KES || 0).toFixed(2)}\n` +
-          `Wallet: ${user.walletId}\n` +
-          `KYC: ${user.kycStatus}`;
-
-        showDashboard();
-      } catch (error) {
-        console.error('Dashboard load error:', error);
-        handleLogout();
-      }
-    }
-
-    function fundWallet() {
-      if (currentUser.kycStatus!== 'TIER_1_VERIFIED') {
-        alert('Please complete BVN verification first.');
-        return;
-      }
-      const currency = prompt("Select currency to fund:\n1 = NGN ₦\n2 = GHS GH₵\n3 = KES KSh", "1");
-      let selectedCurrency = 'NGN';
-      if (currency === '2') selectedCurrency = 'GHS';
-      if (currency === '3') selectedCurrency = 'KES';
-
-      apiCall('/api/wallet/fund', {
-        method: 'POST',
-        body: JSON.stringify({ currency: selectedCurrency })
-      }).then(data => {
-        window.location.href = data.authorization_url;
-      }).catch(err => alert(err.message));
-    }
-
-    function openSendModal() {
-      if (currentUser.kycStatus!== 'TIER_1_VERIFIED') {
-        alert('Complete BVN verification to send money');
-        return;
-      }
-      document.getElementById('sendModal').classList.remove('hidden');
-      document.getElementById('sendError').classList.add('hidden');
-      document.getElementById('sendSuccess').classList.add('hidden');
-    }
-
-    function closeSendModal() {
-      document.getElementById('sendModal').classList.add('hidden');
-    } 
-
-    async function handleTransfer() {
-      const recipientWalletId = document.getElementById('sendRecipient').value.trim();
-      const amount = Number(document.getElementById('sendAmount').value);
-      const btn = document.getElementById('sendBtn');
-
-      if (!recipientWalletId ||!amount) {
-        showError('sendError', 'Recipient and amount required');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.textContent = 'Sending...';
-
-      try {
-        const data = await apiCall('/api/send', {
-          method: 'POST',
-          body: JSON.stringify({ recipientWalletId, amount, currency: 'NGN' })
-        });
-        showSuccess('sendSuccess', data.message);
-        setTimeout(() => { closeSendModal(); loadDashboard(); }, 2000);
-      } catch (error) {
-        showError('sendError', error.message);
-        btn.disabled = false;
-        btn.textContent = 'Send Money';
-      }
-    }
-
-    async function loadTransactions() {
-      try {
-        const user = await apiCall('/api/me');
-        const list = document.getElementById('transactionsList');
-        const transactions = user.transactions || [];
-
-        if (transactions.length === 0) {
-          list.innerHTML = '<p style="text-align:center;color:#64748b;">No transactions yet</p>';
-        } else {
-          list.innerHTML = transactions.map(tx => {
-            const symbol = tx.currency === 'NGN'? '₦' : tx.currency === 'GHS'? 'GH₵' : 'KSh';
-            return `
-            <div class="tx-row">
-              <div>
-                <div>${tx.desc || tx.type} ${tx.currency? `(${tx.currency})` : ''}</div>
-                <div class="tx-date">${new Date(tx.date).toLocaleString()}</div>
-              </div>
-              <div class="${tx.type === 'credit'? 'tx-credit' : 'tx-debit'}">
-                ${tx.type === 'credit'? '+' : '-'}${symbol}${Math.abs(tx.amount).toFixed(2)}
-              </div>
-            </div>
-          `}).join('');
-        }
-        document.getElementById('transactionsCard').style.display = 'block';
-      } catch (error) {
-        showError('sendError', 'Failed to load transactions');
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', async () => {
-      const token = getToken();
-      if (token) {
-        await loadDashboard();
-      } else {
-        showLoader();
-        setTimeout(() => {
-          showAuth();
-          showLogin();
-        }, 1000);
-      }
+$('reg-btn').onclick=async()=>{
+  try{
+    await api('/api/register','POST',{
+      fullName:$('reg-name').value,
+      email:$('reg-email').value,
+      password:$('reg-pass').value
     });
+    toast('Account created. Login now');
+    $('login-tab').click();
+  }catch(e){toast(e.message)}
+}
+
+$('login-btn').onclick=async()=>{
+  try{
+    const {token} = await api('/api/login','POST',{
+      email:$('login-email').value,
+      password:$('login-pass').value
+    });
+    TOKEN=token; localStorage.setItem('cp_token',token);
+    const user = await api('/api/me');
+    showApp(user);
+  }catch(e){toast(e.message)}
+}
+
+$('logout-btn').onclick=()=>{
+  TOKEN=null; localStorage.removeItem('cp_token');
+  $('app-screen').classList.add('hidden');
+  $('auth-screen').classList.remove('hidden');
+}
+
+// === APP LOGIC ===
+$('verify-btn').onclick=async()=>{
+  try{
+    await api('/api/kyc/verify-bvn','POST',{bvn:$('bvn').value});
+    const user = await api('/api/me'); showApp(user);
+    toast('BVN Verified. Tier 1 Active');
+  }catch(e){toast(e.message)}
+}
+
+$('fund-btn').onclick=async()=>{
+  try{
+    const {authorization_url} = await api('/api/wallet/fund','POST',{currency:'NGN'});
+    toast('Redirecting to Paystack...');
+    window.location.href = authorization_url; // Mock for now
+  }catch(e){toast(e.message)}
+}
+
+$('send-btn').onclick=async()=>{
+  try{
+    await api('/api/send','POST',{
+      recipientWalletId:$('send-wallet').value,
+      amount:Number($('send-amount').value),
+      currency:'NGN'
+    });
+    const user = await api('/api/me'); showApp(user);
+    toast('Transfer successful');
+  }catch(e){toast(e.message)}
+}
+
+// === BOOT ===
+(async()=>{
+  if(TOKEN){
+    try{
+      const user = await api('/api/me');
+      showApp(user);
+    }catch{
+      localStorage.removeItem('cp_token');
+    }
+  }
+})();
 </script>
 </body>
 </html>
-  
