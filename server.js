@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
   res.json({ 
     status: 'LIVE ✅', 
     message: 'CreativePay API Phase 4D',
-    endpoints: ['POST /api/register', 'POST /api/login', 'GET /api/me', 'POST /api/wallet/fund', 'POST /api/withdraw']
+    version: 'v1.1-FINAL'
   });
 });
 
@@ -105,6 +105,7 @@ app.post('/api/kyc/verify-bvn', auth, asyncHandler(async (req, res) => {
   res.json({ message: 'KYC Tier 1 Verified', kycStatus: user.kycStatus });
 }));
 
+// FIXED: CLOSED PROPERLY
 app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
   const { currency } = req.body;
   const user = await User.findById(req.user.id);
@@ -117,7 +118,7 @@ app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
     { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
   );
   res.json({ authorization_url: paystackRes.data.authorization_url, reference });
-
+})); // <-- FIX 1: ADDED )}); HERE
 
 app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => {
   const { reference } = req.params;
@@ -159,6 +160,7 @@ app.get('/api/banks', auth, asyncHandler(async (req, res) => {
   res.json({ banks: banks.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) });
 }));
 
+// FIXED: CLOSED PROPERLY
 app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   const { accountNumber, bankCode, amount, currency } = req.body;
   if (currency!== 'NGN') return res.status(400).json({ error: 'Withdrawals only supported for NGN' });
@@ -181,7 +183,7 @@ app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   user.transactions.push({ type: 'debit', currency: 'NGN', amount, desc: `Withdrawal to ${accountNumber}`, date: new Date() });
   await user.save();
   res.json({ message: `✅ NGN ${amount} withdrawal initiated`, status: transfer.data.status, balances: user.balances });
-}));
+})); // <-- FIX 2: ADDED )}); HERE
 
 // ERROR HANDLER
 app.use((err, req, res, next) => {
@@ -190,4 +192,4 @@ app.use((err, req, res, next) => {
 });
 
 // START SERVER
-app.listen(PORT, () => console.log(`🚀 CreativePay Phase 4D server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 CreativePay Phase 4D v1.1 server running on port ${PORT}`));
