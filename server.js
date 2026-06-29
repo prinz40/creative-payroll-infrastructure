@@ -1,4 +1,4 @@
-require('dotenv').config();
+4[require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -9,7 +9,7 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(cors());
+app.use(cors());-j  pm 
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
