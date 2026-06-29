@@ -1,6 +1,6 @@
 {
-  "name": "creativepay-backend",
-  "version": "4.0.0",
+  "name": "creativepay-phase4d",
+  "version": "1.3.6",
   "description": "CreativePay Phase 4D Backend",
   "main": "server.js",
   "scripts": {
@@ -10,12 +10,11 @@
     "express": "^4.19.2",
     "cors": "^2.8.5",
     "jsonwebtoken": "^9.0.2",
-    "bcrypt": "^5.1.1",
-    "mongoose": "^8.5.1",
-    "axios": "^1.6.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1",
     "dotenv": "^16.4.5"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }
