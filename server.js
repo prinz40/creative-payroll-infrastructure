@@ -154,7 +154,7 @@ app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   user.transactions.push({ type: 'debit', currency: 'NGN', amount, desc: `Withdrawal to ${accountNumber}`, date: new Date() });
   await user.save();
   res.json({ message: `NGN ${amount} withdrawal initiated`, status: transferRes.data.status, balances: user.balances }); // FIXED:.data.data
-}));
+});
 
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.stack);
