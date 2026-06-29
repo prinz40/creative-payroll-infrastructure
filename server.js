@@ -117,7 +117,7 @@ app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
     { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
   );
   res.json({ authorization_url: paystackRes.data.authorization_url, reference });
-}));
+
 
 app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => {
   const { reference } = req.params;
