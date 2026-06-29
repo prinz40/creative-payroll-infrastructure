@@ -30,9 +30,9 @@ mongoose.connect(MONGO_URI)
 .catch(err => { 
     console.error('❌ MongoDB connection error:', err); 
     process.exit(1); 
-  });
+});
 
-// SCHEMA - Object not Map
+// SCHEMA
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true, lowercase: true, trim: true },
   fullName: { type: String, required: true },
@@ -64,12 +64,8 @@ const asyncHandler = fn => (req, res, next) => Promise.resolve(fn(req, res, next
 app.get('/', (req, res) => {
   res.json({ 
     status: 'LIVE ✅', 
-    message: 'CreativePay API is running',
-    endpoints: {
-      register: 'POST /api/register',
-      login: 'POST /api/login', 
-      me: 'GET /api/me'
-    }
+    message: 'CreativePay API Phase 4D',
+    endpoints: ['POST /api/register', 'POST /api/login', 'GET /api/me', 'POST /api/wallet/fund', 'POST /api/withdraw']
   });
 });
 
@@ -78,7 +74,7 @@ app.post('/api/register', asyncHandler(async (req, res) => {
   const { email, fullName, password } = req.body;
   if (!email ||!fullName ||!password) return res.status(400).json({ error: 'All fields required' });
   if (await User.findOne({ email })) return res.status(400).json({ error: 'Email already registered' });
-  
+
   const walletId = `CPY-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
   const user = await User.create({ 
     email, 
@@ -94,7 +90,7 @@ app.post('/api/login', asyncHandler(async (req, res) => {
   const user = await User.findOne({ email });
   if (!user ||!(await bcrypt.compare(password, user.passwordHash))) 
     return res.status(401).json({ error: 'Invalid credentials' });
-  
+
   const token = jwt.sign({ id: user._id, kycStatus: user.kycStatus }, JWT_SECRET, { expiresIn: '7d' });
   res.json({ token, walletId: user.walletId, balances: user.balances, kycStatus: user.kycStatus });
 }));
@@ -114,25 +110,25 @@ app.post('/api/wallet/fund', auth, asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
   const amount = currency === 'NGN'? 10000 : currency === 'GHS'? 10005 : 10030;
   const reference = `cpy_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
-  
+
   const paystackRes = await axios.post(
     'https://api.paystack.co/transaction/initialize', 
     { email: user.email, amount, currency, reference, callback_url: `${FRONTEND_URL}/verify.html?ref=${reference}` }, 
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } // FIXED: 2 closing )
+    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
   );
-  res.json({ authorization_url: paystackRes.data.authorization_url, reference }); // FIXED:.data.data
-});
+  res.json({ authorization_url: paystackRes.data.authorization_url, reference });
+}));
 
 app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => {
   const { reference } = req.params;
   const user = await User.findById(req.user.id);
   const verify = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
-  const data = verify.data; // FIXED:.data.data
-  
+  const data = verify.data;
+
   if (data.status!== 'success') return res.status(400).json({ error: 'Payment not successful' });
   const currency = data.currency;
   const amount = data.amount / 100;
-  
+
   user.balances[currency] = (user.balances[currency] || 0) + amount;
   user.transactions.push({ type: 'credit', currency, amount, desc: 'Wallet Funding', date: new Date() });
   await user.save();
@@ -142,12 +138,12 @@ app.get('/api/wallet/verify/:reference', auth, asyncHandler(async (req, res) => 
 app.post('/api/send', auth, asyncHandler(async (req, res) => {
   const { recipientWalletId, amount, currency, description } = req.body;
   if (req.user.kycStatus!== 'TIER_1_VERIFIED') return res.status(403).json({ error: 'KYC required' });
-  
+
   const sender = await User.findById(req.user.id);
   const receiver = await User.findOne({ walletId: recipientWalletId });
   if (!receiver) return res.status(404).json({ error: 'Recipient not found' });
   if ((sender.balances[currency] || 0) < amount) return res.status(400).json({ error: 'Insufficient balance' });
-  
+
   sender.balances[currency] -= amount;
   receiver.balances[currency] = (receiver.balances[currency] || 0) + amount;
   sender.transactions.push({ type: 'debit', currency, amount, desc: `To ${receiver.email}`, date: new Date() });
@@ -160,7 +156,7 @@ app.get('/api/banks', auth, asyncHandler(async (req, res) => {
   const { currency } = req.query;
   if (currency!== 'NGN') return res.json({ banks: [] });
   const banks = await axios.get('https://api.paystack.co/bank', { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } });
-  res.json({ banks: banks.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) }); // FIXED:.data.data
+  res.json({ banks: banks.data.filter(b => b.active).map(b => ({ name: b.name, code: b.code })) });
 }));
 
 app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
@@ -168,24 +164,24 @@ app.post('/api/withdraw', auth, asyncHandler(async (req, res) => {
   if (currency!== 'NGN') return res.status(400).json({ error: 'Withdrawals only supported for NGN' });
   const user = await User.findById(req.user.id);
   if ((user.balances.NGN || 0) < amount) return res.status(400).json({ error: 'Insufficient NGN balance' });
-  
+
   const recipient = await axios.post('https://api.paystack.co/transferrecipient', 
     { type: 'nuban', name: user.fullName, account_number: accountNumber, bank_code: bankCode, currency: 'NGN' }, 
     { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
   );
   const transfer = await axios.post('https://api.paystack.co/transfer', 
-    { source: 'balance', amount: amount * 100, recipient: recipient.data.recipient_code, reason: 'CreativePay Withdrawal' }, // FIXED:.data.data
+    { source: 'balance', amount: amount * 100, recipient: recipient.data.recipient_code, reason: 'CreativePay Withdrawal' },
     { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
   );
-  
-  if (transfer.data.status!== 'success' && transfer.data.status!== 'pending') // FIXED:.data.data
+
+  if (transfer.data.status!== 'success' && transfer.data.status!== 'pending') 
     return res.status(400).json({ error: 'Transfer failed' });
-    
+
   user.balances.NGN -= amount;
   user.transactions.push({ type: 'debit', currency: 'NGN', amount, desc: `Withdrawal to ${accountNumber}`, date: new Date() });
   await user.save();
-  res.json({ message: `✅ NGN ${amount} withdrawal initiated`, status: transfer.data.status, balances: user.balances }); // FIXED:.data.data
-});
+  res.json({ message: `✅ NGN ${amount} withdrawal initiated`, status: transfer.data.status, balances: user.balances });
+}));
 
 // ERROR HANDLER
 app.use((err, req, res, next) => {
