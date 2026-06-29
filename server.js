@@ -102,18 +102,32 @@ app.get('/api/me', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
   try {
     const { bvn } = req.body;
-    if (!bvn || String(bvn).length!== 11) return res.status(400).json({ error: 'BVN must be 11 digits' });
+    if (!bvn || String(bvn).length !== 11) 
+      return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
+
+    // TEMP GATE: Only this BVN passes. All others = Invalid
+    const validTestBVN = '22222'; 
+    if (bvn !== validTestBVN) 
+      return res.status(400).json({ success: false, message: 'Invalid BVN' });
+
     const user = await User.findById(req.user.uid);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
     user.bvn = bvn;
     user.kycStatus = 'TIER_2_VERIFIED';
     await user.save();
-    res.json({ success: true });
+    
+    // CRITICAL: Always return balances so frontend doesn't crash on .NGN
+    return res.status(200).json({ 
+      success: true, 
+      message: 'BVN Verified',
+      data: { balances: user.balances }
+    });
   } catch (e) {
-    res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
