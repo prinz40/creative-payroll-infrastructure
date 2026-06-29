@@ -4,7 +4,7 @@
 const API_URL = 'https://creative-payroll-infrastructure.onrender.com';
 
 // ===================
-// KYC BVN VERIFICATION - UPDATED URL
+// KYC BVN VERIFICATION - BULLETPROOF
 // ===================
 async function verifyBVN() {
   const bvnInput = document.getElementById('bvnInput');
@@ -19,9 +19,9 @@ async function verifyBVN() {
   bvnError.style.display = 'none';
   bvnSuccess.style.display = 'none';
 
-  // Validation
-  if (!bvn || bvn.length!== 11 ||!/^\d+$/.test(bvn)) {
-    bvnError.textContent = 'BVN must be exactly 11 digits';
+  // Validation: Allow 5 or 11 digits for now. Real NIBSS = 11 only
+  if (!bvn || !/^\d+$/.test(bvn) || (bvn.length !== 11 && bvn.length !== 5)) {
+    bvnError.textContent = 'BVN must be 5 or 11 digits';
     bvnError.style.display = 'block';
     return;
   }
@@ -48,14 +48,13 @@ async function verifyBVN() {
 
     const data = await response.json();
 
-    if (response.ok) {
-      bvnSuccess.textContent = data.message;
+    if (response.ok && data.success === true) {
+      bvnSuccess.textContent = data.message || 'BVN Verified';
       bvnSuccess.style.display = 'block';
 
-      // Update localStorage
-      const user = JSON.parse(localStorage.getItem('user'));
-      user.kycStatus = data.kycStatus;
-      user.kycTier = data.kycTier;
+      // Update localStorage safely
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      user.kycStatus = 'TIER_2_VERIFIED'; // Match backend
       localStorage.setItem('user', JSON.stringify(user));
 
       // Redirect to dashboard after 2 seconds
@@ -64,7 +63,8 @@ async function verifyBVN() {
       }, 2000);
 
     } else {
-      bvnError.textContent = data.error || 'Verification failed';
+      // THIS IS THE FIX: Read backend's message, not error
+      bvnError.textContent = data.message || 'Verification failed';
       bvnError.style.display = 'block';
     }
 
@@ -79,7 +79,7 @@ async function verifyBVN() {
 }
 
 // ===================
-// LOGIN FUNCTION - FOR CONTEXT
+// LOGIN FUNCTION - FIXED KYC CHECK
 // ===================
 async function login() {
   const email = document.getElementById('email').value;
@@ -99,14 +99,14 @@ async function login() {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      // Check KYC status
-      if (data.user.kycStatus === 'unverified' || data.user.kycTier === 0) {
+      // FIX: Backend uses 'UNVERIFIED' string, not 0
+      if (data.user.kycStatus === 'UNVERIFIED') {
         window.location.href = '/?kyc=required';
       } else {
         window.location.href = '/';
       }
     } else {
-      errorMsg.textContent = data.error;
+      errorMsg.textContent = data.error || data.message || 'Login failed';
     }
   } catch (error) {
     errorMsg.textContent = 'Network error. Please try again.';
