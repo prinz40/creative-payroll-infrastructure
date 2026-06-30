@@ -12,11 +12,16 @@ const walletSchema = new mongoose.Schema({
     unique: true, 
     required: true 
   },
-  // v1.6.3 FIELDS - Matches server.js exactly
-  mainBalance: { type: Number, default: 0, min: 0 },
-  airtimeBalance: { type: Number, default: 0, min: 0 },
-  dataBalance: { type: Number, default: 0, min: 0 },
-  bvn: { type: String, default: null },
+  // ✅ FIXED: Multi-currency support with Map (matches server.js)
+  balances: {
+    type: Map,
+    of: Number,
+    default: { 'NGN': 0, 'GHS': 0, 'KES': 0 }
+  },
+  currency: {
+    type: String,
+    default: 'NGN'
+  },
   status: { 
     type: String, 
     default: 'active', 
@@ -24,19 +29,15 @@ const walletSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// HELPER: For backward compatibility if old code calls getBalance('NGN')
+// HELPER: Get balance for any currency. Safe fallback to 0
 walletSchema.methods.getBalance = function(currency = 'NGN') {
-  if (currency === 'NGN') return this.mainBalance || 0;
-  if (currency === 'AIRTIME') return this.airtimeBalance || 0;
-  if (currency === 'DATA') return this.dataBalance || 0;
-  return 0;
+  return this.balances.get(currency) || 0;
 };
 
-// HELPER: Add money safely
+// HELPER: Add money to a currency
 walletSchema.methods.addBalance = function(currency, amount) {
-  if (currency === 'NGN') this.mainBalance += amount;
-  if (currency === 'AIRTIME') this.airtimeBalance += amount;
-  if (currency === 'DATA') this.dataBalance += amount;
+  const current = this.getBalance(currency);
+  this.balances.set(currency, current + amount);
   return this.save();
 };
 

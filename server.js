@@ -15,7 +15,7 @@ app.set('trust proxy', 1);
 const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
 for (const env of requiredEnvs) {
   if (!process.env[env]) {
-    console.error(`❌ FATAL: ${env} missing in.env`);
+    console.error(`❌ FATAL: ${env} missing in .env`);
     process.exit(1);
   }
 }
@@ -84,7 +84,7 @@ const buildUserResponse = async (user) => {
   return { id: user._id, email: user.email, fullName: user.fullName, kycTier: user.kycTier, kycStatus: user.kycStatus, balances, activeCurrency: wallet.currency, walletId: wallet.walletId };
 };
 
-// 7. ROUTES - MATCH PHASE4B EXACTLY
+// 7. ROUTES - PHASE 4B
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
@@ -104,13 +104,13 @@ app.post('/api/login', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: 'Login failed' }); }
 });
 
-// CRITICAL: /api/bvn NOT /api/kyc/verify-bvn
+// ✅ CRITICAL FIX: Endpoint is /api/bvn NOT /api/kyc/verify-bvn
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
     if (!/^\d{11}$/.test(bvn)) return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     await User.findByIdAndUpdate(req.user.id, { bvn, kycTier: 1, kycStatus: 'verified' });
-    await Wallet.findOneAndUpdate({ userId: req.user.id }, { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } }, { upsert: true, new: true });
+    await Wallet.findOneAndUpdate({ userId: req.user.id }, { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } } }, { upsert: true, new: true });
     res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
   } catch (e) { res.status(500).json({ success: false, message: 'BVN failed' }); }
 });
@@ -120,7 +120,7 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   res.json({ success: true, user: await buildUserResponse(user) });
 });
 
-// 8. STATIC - SERVE INDEX.HTML NOT INDEX.V4.HTML
+// ✅ CRITICAL FIX: Serve index.html (not index.v4.html)
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
