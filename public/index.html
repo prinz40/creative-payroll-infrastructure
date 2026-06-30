@@ -26,6 +26,7 @@
     .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
     .kyc-banner { background: #166534; color: #4ade80; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
     .kyc-warning { background: #854d0e; color: #facc15; padding: 12px; border-radius: 6px; margin-bottom: 20px; text-align: center; }
+    .loading { text-align: center; padding: 20px; color: #38bdf8; }
   </style>
 </head>
 <body>
@@ -33,7 +34,6 @@
   <div id="authForm" class="container">
     <h1>CreativePay</h1>
 
-    
     <!-- LOGIN -->
     <div id="loginSection">
       <h2>Login</h2>
@@ -95,7 +95,8 @@
   </div>
 
   <script>
-    const API_URL = window.location.origin; // Auto-detect current domain
+    // CRITICAL: HARDCODED BACKEND URL - NO MORE WINDOW.LOCATION.ORIGIN
+    const API_URL = 'https://creative-payroll-infrastructure.onrender.com/api';
     const TOKEN_KEY = 'creativepay_token';
 
     // HELPERS
@@ -114,12 +115,14 @@
       const el = document.getElementById(id);
       el.textContent = msg;
       el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 3000);
     };
 
-    // API CALLS
+    // API CALLS - WITH BETTER ERROR LOGGING
     async function apiCall(endpoint, options = {}) {
       const token = getToken();
       try {
+        console.log(`API CALL: ${API_URL}${endpoint}`); // Debug line
         const res = await fetch(`${API_URL}${endpoint}`, {
           ...options,
           headers: {
@@ -138,7 +141,8 @@
         if (!res.ok) throw new Error(data.message || 'Request failed');
         return data;
       } catch (err) {
-        throw err;
+        console.error('API ERROR:', err); // Debug line
+        throw new Error(err.message || 'Network error. Check backend URL.');
       }
     }
 
@@ -152,12 +156,13 @@
       }
 
       try {
-        const data = await apiCall('/api/login', {
+        const data = await apiCall('/login', {
           method: 'POST',
           body: JSON.stringify({ email, password })
         });
         setToken(data.token);
-        showDashboard(data.user);
+        if (data.user.kycTier >= 1) showDashboard(data.user);
+        else showBVN();
       } catch (err) {
         showError('loginError', err.message);
       }
@@ -173,7 +178,7 @@
       }
 
       try {
-        const data = await apiCall('/api/register', {
+        const data = await apiCall('/register', {
           method: 'POST',
           body: JSON.stringify({ fullName, email, password })
         });
@@ -192,7 +197,7 @@
       }
 
       try {
-        const data = await apiCall('/api/bvn', {
+        const data = await apiCall('/bvn', {
           method: 'POST',
           body: JSON.stringify({ bvn })
         });
@@ -227,15 +232,17 @@
     function showDashboard(user) {
       document.getElementById('authForm').classList.add('hidden');
       document.getElementById('dashboardSection').classList.remove('hidden');
-      
-      document.getElementById('userEmail').textContent = user.email;
-      document.getElementById('userName').textContent = user.fullName;
+
+      document.getElementById('userEmail').textContent = user.email || 'N/A';
+      document.getElementById('userName').textContent = user.fullName || 'N/A';
       document.getElementById('userStatus').textContent = user.kycTier >= 1 ? '✅ KYC Verified' : '⚠️ Pending';
-      
+
+      // SAFE DEFAULTS - NO MORE "Cannot read NGN"
       const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
-      document.getElementById('userBalance').textContent = `₦${Number(balances.NGN || 0).toFixed(2)}`;
+      const ngn = Number(balances.NGN ?? 0);
+      document.getElementById('userBalance').textContent = `₦${ngn.toFixed(2)}`;
       document.getElementById('walletId').textContent = `Wallet: ${user.walletId || 'N/A'}`;
-      
+
       if (user.kycTier >= 1) {
         document.getElementById('kycBanner').style.display = 'block';
       }
@@ -248,9 +255,10 @@
 
     // INIT
     window.addEventListener('DOMContentLoaded', async () => {
+      console.log('API_URL:', API_URL); // Debug line
       if (getToken()) {
         try {
-          const data = await apiCall('/api/user');
+          const data = await apiCall('/user');
           showDashboard(data.user);
         } catch {
           clearToken();
