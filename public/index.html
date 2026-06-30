@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CreativePay - Phase 4D v1.3.6</title>
+<title>CreativePay - Phase 4D v1.3.7</title>
 <style>
 :root{--primary:#1A1A2E;--accent:#0F9D58;--bg:#F5F5F7;--card:#fff;--text:#1A1A2E;--muted:#6B7280}
 *{box-sizing:border-box;margin:0;padding:0;font-family:Inter,system-ui,sans-serif}
@@ -86,9 +86,35 @@ body{background:var(--bg);color:var(--text);padding:20px}
 </div>
 
 <script>
-// === CONFIG ===
-const API_URL = window.location.origin; // Auto-detects your Render URL. No edits needed.
+// === CONFIG v4 = CACHE BUST ===
+const API_URL = window.location.origin; 
 let TOKEN = localStorage.getItem('cp_token');
+
+// === HELPER: FETCH WITH TIMEOUT + RETRY FOR RENDER COLD START ===
+async function fetchWithRetry(url, options = {}, retries = 2, delay = 2000) {
+  for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      const isLastAttempt = i === retries;
+      const isNetworkError = error.name === 'AbortError' || error.message.includes('Failed to fetch');
+      
+      if (isNetworkError && !isLastAttempt) {
+        toast(`Server waking up. Please tap Verify again in 5s.`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
 
 // === HELPERS ===
 const $ = id => document.getElementById(id);
@@ -97,6 +123,15 @@ const toast = msg => {
   setTimeout(()=>t.style.display='none',3000);
 }
 const fmt = n => `₦${Number(n||0).toLocaleString('en-NG',{minimumFractionDigits:2})}`;
+
+// === API WRAPPER ===
+async function api(path, method='GET', body){
+  return fetchWithRetry(API_URL+path,{
+    method,
+    headers:{'Content-Type':'application/json',...(TOKEN?{'Authorization':'Bearer '+TOKEN}:{})},
+    body: body?JSON.stringify(body):null
+  });
+}
 
 // === UI TOGGLE ===
 function showApp(user){
@@ -124,17 +159,6 @@ function renderTx(txs){
 }
 
 // === AUTH LOGIC ===
-async function api(path, method='GET', body){
-  const res = await fetch(API_URL+path,{
-    method,
-    headers:{'Content-Type':'application/json',...(TOKEN?{'Authorization':'Bearer '+TOKEN}:{})},
-    body: body?JSON.stringify(body):null
-  });
-  const data = await res.json();
-  if(!res.ok) throw new Error(data.error||'Request failed');
-  return data;
-}
-
 $('login-tab').onclick=()=>{
   $('login-tab').classList.add('active');$('reg-tab').classList.remove('active');
   $('login-form').classList.remove('hidden');$('reg-form').classList.add('hidden');
@@ -187,7 +211,7 @@ $('fund-btn').onclick=async()=>{
   try{
     const {authorization_url} = await api('/api/wallet/fund','POST',{currency:'NGN'});
     toast('Redirecting to Paystack...');
-    window.location.href = authorization_url; // Mock for now
+    window.location.href = authorization_url; 
   }catch(e){toast(e.message)}
 }
 
