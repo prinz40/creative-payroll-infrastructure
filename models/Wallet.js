@@ -1,44 +1,42 @@
 const mongoose = require('mongoose');
 
 const walletSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true, 
+    unique: true 
   },
-  // OLD: balance: { type: Number, default: 0, min: 0 }
-  // NEW: Multi-currency balances
-  balances: {
-    type: Map,
-    of: Number,
-    default: { 'NGN': 0 } // Start everyone with NGN 0
+  walletId: { 
+    type: String, 
+    unique: true, 
+    required: true 
   },
-  currency: {
-    type: String,
-    default: 'NGN' // This is the "active" currency shown on dashboard
-  },
-  walletId: {
-    type: String,
-    unique: true,
-    required: true
-  },
-  status: {
-    type: String,
-    default: 'active',
-    enum: ['active', 'frozen', 'closed']
+  // v1.6.3 FIELDS - Matches server.js exactly
+  mainBalance: { type: Number, default: 0, min: 0 },
+  airtimeBalance: { type: Number, default: 0, min: 0 },
+  dataBalance: { type: Number, default: 0, min: 0 },
+  bvn: { type: String, default: null },
+  status: { 
+    type: String, 
+    default: 'active', 
+    enum: ['active', 'frozen', 'closed'] 
   }
 }, { timestamps: true });
 
-// HELPER: Get balance for any currency. Safe fallback to 0
+// HELPER: For backward compatibility if old code calls getBalance('NGN')
 walletSchema.methods.getBalance = function(currency = 'NGN') {
-  return this.balances.get(currency) || 0;
+  if (currency === 'NGN') return this.mainBalance || 0;
+  if (currency === 'AIRTIME') return this.airtimeBalance || 0;
+  if (currency === 'DATA') return this.dataBalance || 0;
+  return 0;
 };
 
-// HELPER: Add money to a currency
+// HELPER: Add money safely
 walletSchema.methods.addBalance = function(currency, amount) {
-  const current = this.getBalance(currency);
-  this.balances.set(currency, current + amount);
+  if (currency === 'NGN') this.mainBalance += amount;
+  if (currency === 'AIRTIME') this.airtimeBalance += amount;
+  if (currency === 'DATA') this.dataBalance += amount;
   return this.save();
 };
 
