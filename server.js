@@ -1,170 +1,129 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs'); // ONLY 1 bcrypt
-const path = require('path'); // ONLY 1 path
-const { v4: uuidv4 } = require('uuid'); // ONLY 1 uuid
+const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+const axios = require('axios');
+const rateLimit = require('express-rate-limit');
+require('dotenv').config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
 
-// === ENV VARS - RENDER WILL READ THESE ===
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'creativepay-dev-secret';
-const MONGO_URI = process.env.MONGO_URI; // MUST set this in Render
-
-if (!MONGO_URI) {
-  console.error('FATAL: MONGO_URI missing');
-  process.exit(1);
+// 1. ENV VALIDATION
+const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
+for (const env of requiredEnvs) {
+  if (!process.env[env]) {
+    console.error(`❌ FATAL: ${env} missing in.env`);
+    process.exit(1);
+  }
 }
 
-// === DB CONNECT ===
-mongoose.connect(MONGO_URI)
-.then(() => console.log('MongoDB Connected'))
-.catch(err => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1);
-  });
+// RATES for MVP
+const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
 
-// === SCHEMA ===
+// 2. MIDDLEWARE
+app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { success: false, message: 'Too many requests' } });
+app.use('/api/', limiter);
+
+// 3. DATABASE
+mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
+.then(() => console.log('✅ MongoDB Connected'))
+.catch(err => { console.error('❌ MongoDB Error:', err); process.exit(1); });
+
+// 4. MODELS
 const userSchema = new mongoose.Schema({
-  email: { type: String, unique: true, required: true, lowercase: true, trim: true },
-  fullName: { type: String, required: true },
-  passwordHash: { type: String, required: true },
-  walletId: { type: String, unique: true },
-  kycStatus: { type: String, default: 'UNVERIFIED' },
-  bvn: { type: String },
-  balances: { type: Object, default: { NGN: 0, GHS: 0, KES: 0 } },
-  transactions: { type: Array, default: [] }
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true },
+  fullName: { type: String },
+  bvn: { type: String, default: null },
+  kycTier: { type: Number, default: 0 },
+  kycStatus: { type: String, default: 'unverified' }
 }, { timestamps: true });
-
 const User = mongoose.model('User', userSchema);
 
-// === AUTH MIDDLEWARE ===
-function auth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token' });
-  try {
-    req.user = jwt.verify(token, JWT_SECRET);
-    next();
-  } catch {
-    return res.status(403).json({ error: 'Invalid token' });
-  }
-}
+const walletSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
+  walletId: { type: String, unique: true },
+  balances: { type: Map, of: Number, default: { NGN: 0, GHS: 0, KES: 0 } },
+  currency: { type: String, default: 'NGN' }
+});
+const Wallet = mongoose.model('Wallet', walletSchema);
 
-// === API ROUTES ===
+const transactionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  reference: { type: String, required: true, unique: true },
+  amount: { type: Number },
+  amountNGN: { type: Number },
+  status: { type: String, enum: ['success', 'failed', 'pending'], default: 'pending' },
+  type: { type: String, enum: ['credit', 'debit', 'transfer'] },
+  currency: { type: String, default: 'NGN' },
+  metadata: { type: Object }
+}, { timestamps: true });
+const Transaction = mongoose.model('Transaction', transactionSchema);
+
+// 5. AUTH
+const authMiddleware = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ success: false, message: 'No token' });
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch { return res.status(401).json({ success: false, message: 'Invalid token' }); }
+};
+
+// 6. HELPER
+const buildUserResponse = async (user) => {
+  let wallet = await Wallet.findOne({ userId: user._id });
+  if (!wallet) wallet = { balances: { NGN: 0, GHS: 0, KES: 0 }, walletId: null, currency: 'NGN' };
+  const balances = Object.fromEntries(wallet.balances || new Map([['NGN',0],['GHS',0],['KES',0]]));
+  return { id: user._id, email: user.email, fullName: user.fullName, kycTier: user.kycTier, kycStatus: user.kycStatus, balances, activeCurrency: wallet.currency, walletId: wallet.walletId };
+};
+
+// 7. ROUTES - MATCH PHASE4B EXACTLY
 app.post('/api/register', async (req, res) => {
   try {
-    const { fullName, email, password } = req.body;
-    if (!fullName ||!email ||!password) return res.status(400).json({ error: 'All fields required' });
-    if (await User.findOne({ email })) return res.status(409).json({ error: 'Email exists' });
-
-    const user = new User({
-      fullName,
-      email,
-      passwordHash: await bcrypt.hash(password, 10),
-      walletId: 'CPY-' + Math.random().toString(36).slice(2, 10).toUpperCase(),
-      balances: { NGN: 0, GHS: 0, KES: 0 },
-      kycStatus: 'UNVERIFIED',
-      transactions: []
-    });
-    await user.save();
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
+    const { email, password, fullName } = req.body;
+    if (await User.findOne({ email })) return res.status(400).json({ success: false, message: 'User exists' });
+    const user = await User.create({ email, password: await bcrypt.hash(password, 12), fullName });
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({ success: true, user: await buildUserResponse(user), token });
+  } catch (e) { res.status(500).json({ success: false, message: 'Register failed' }); }
 });
 
 app.post('/api/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user ||!(await bcrypt.compare(password, user.passwordHash))) 
-      return res.status(401).json({ error: 'Invalid login' });
-    
-    const token = jwt.sign({ uid: user._id }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
+    const user = await User.findOne({ email: req.body.email });
+    if (!user ||!(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ success: false, message: 'Invalid' });
+    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, user: await buildUserResponse(user), token });
+  } catch (e) { res.status(500).json({ success: false, message: 'Login failed' }); }
 });
 
-app.get('/api/me', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.uid).select('-passwordHash');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ user });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
+// CRITICAL: /api/bvn NOT /api/kyc/verify-bvn
+app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
-    if (!bvn || String(bvn).length!== 11) 
-      return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
-
-    // TEMP GATE: Only this BVN passes. All others = Invalid
-    const validTestBVN = '22222'; 
-    if (bvn!== validTestBVN) 
-      return res.status(400).json({ success: false, message: 'Invalid BVN' });
-
-    const user = await User.findById(req.user.uid);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-    user.bvn = bvn;
-    user.kycStatus = 'TIER_2_VERIFIED';
-    await user.save();
-    
-    // CRITICAL: Always return balances so frontend doesn't crash on.NGN
-    return res.status(200).json({ 
-      success: true, 
-      message: 'BVN Verified',
-      data: { balances: user.balances }
-    });
-  } catch (e) {
-    return res.status(500).json({ success: false, message: 'Server error' });
-  }
+    if (!/^\d{11}$/.test(bvn)) return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
+    await User.findByIdAndUpdate(req.user.id, { bvn, kycTier: 1, kycStatus: 'verified' });
+    await Wallet.findOneAndUpdate({ userId: req.user.id }, { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } }, { upsert: true, new: true });
+    res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
+  } catch (e) { res.status(500).json({ success: false, message: 'BVN failed' }); }
 });
 
-app.post('/api/wallet/fund', auth, async (req, res) => {
-  // TODO: Replace with real Paystack later
-  res.json({ authorization_url: 'https://paystack.com/pay/test' });
+app.get('/api/user', authMiddleware, async (req, res) => {
+  const user = await User.findById(req.user.id).select('-password');
+  res.json({ success: true, user: await buildUserResponse(user) });
 });
 
-app.post('/api/send', auth, async (req, res) => {
-  try {
-    const { recipientWalletId, amount, currency = 'NGN' } = req.body;
-    const sender = await User.findById(req.user.uid);
-    const recipient = await User.findOne({ walletId: recipientWalletId });
-    if (!recipient) return res.status(404).json({ error: 'Wallet not found' });
-    if (sender.balances[currency] < amount) return res.status(400).json({ error: 'Insufficient balance' });
-
-    sender.balances[currency] -= amount;
-    recipient.balances[currency] += amount;
-    
-    const tx = { id: uuidv4(), from: sender.walletId, to: recipientWalletId, amount, currency, type: 'debit', desc: 'Sent', at: new Date() };
-    sender.transactions.push(tx);
-    recipient.transactions.push({...tx, type: 'credit' });
-    
-    await sender.save();
-    await recipient.save();
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// === SERVE FRONTEND - FIXED TO index.v4.html ===
+// 8. STATIC - SERVE INDEX.HTML NOT INDEX.V4.HTML
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.v4.html')); // <-- FIXED: No more ENOENT
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// === BOOT ===
-app.listen(PORT, () => console.log(`CreativePay 4D v1.6.2 running on port ${PORT}`));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`🚀 Phase 4B Compatible server on ${PORT}`));
