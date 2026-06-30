@@ -24,8 +24,8 @@ if (!MONGO_URI) {
 
 // === DB CONNECT ===
 mongoose.connect(MONGO_URI)
- .then(() => console.log('MongoDB Connected'))
- .catch(err => {
+.then(() => console.log('MongoDB Connected'))
+.catch(err => {
     console.error('MongoDB connection error:', err);
     process.exit(1);
   });
@@ -102,15 +102,16 @@ app.get('/api/me', auth, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
   try {
     const { bvn } = req.body;
-    if (!bvn || String(bvn).length !== 11) 
+    if (!bvn || String(bvn).length!== 11) 
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
 
     // TEMP GATE: Only this BVN passes. All others = Invalid
     const validTestBVN = '22222'; 
-    if (bvn !== validTestBVN) 
+    if (bvn!== validTestBVN) 
       return res.status(400).json({ success: false, message: 'Invalid BVN' });
 
     const user = await User.findById(req.user.uid);
@@ -120,7 +121,7 @@ app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
     user.kycStatus = 'TIER_2_VERIFIED';
     await user.save();
     
-    // CRITICAL: Always return balances so frontend doesn't crash on .NGN
+    // CRITICAL: Always return balances so frontend doesn't crash on.NGN
     return res.status(200).json({ 
       success: true, 
       message: 'BVN Verified',
@@ -159,11 +160,11 @@ app.post('/api/send', auth, async (req, res) => {
   }
 });
 
-// === SERVE FRONTEND ===
+// === SERVE FRONTEND - FIXED TO index.v4.html ===
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.v4.html')); // <-- FIXED: No more ENOENT
 });
 
 // === BOOT ===
-app.listen(PORT, () => console.log(`CreativePay 4D v1.6.1 running on port ${PORT}`));
+app.listen(PORT, () => console.log(`CreativePay 4D v1.6.2 running on port ${PORT}`));
