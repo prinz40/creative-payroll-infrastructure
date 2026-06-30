@@ -15,25 +15,36 @@ app.set('trust proxy', 1);
 const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
 for (const env of requiredEnvs) {
   if (!process.env[env]) {
-    console.error(`❌ FATAL: ${env} missing in .env`);
+    console.error(`❌ FATAL: ${env} missing`);
     process.exit(1);
   }
 }
+
+console.log('✅ All required environment variables found');
 
 // RATES for MVP
 const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
 
 // 2. MIDDLEWARE
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(cors({ origin: '*', credentials: true })); // Allow all origins during testing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { success: false, message: 'Too many requests' } });
 app.use('/api/', limiter);
 
 // 3. DATABASE
-mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
-.then(() => console.log('✅ MongoDB Connected'))
-.catch(err => { console.error('❌ MongoDB Error:', err); process.exit(1); });
+const mongooseOptions = { 
+  serverSelectionTimeoutMS: 10000,
+  connectTimeoutMS: 10000
+};
+
+console.log('🔄 Connecting to MongoDB...');
+mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
+  .then(() => console.log('✅ MongoDB Connected Successfully'))
+  .catch(err => { 
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
+  });
 
 // 4. MODELS
 const userSchema = new mongoose.Schema({
@@ -73,7 +84,10 @@ const authMiddleware = async (req, res, next) => {
     if (!token) return res.status(401).json({ success: false, message: 'No token' });
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
-  } catch { return res.status(401).json({ success: false, message: 'Invalid token' }); }
+  } catch (err) { 
+    console.error('Auth error:', err.message);
+    return res.status(401).json({ success: false, message: 'Invalid token' }); 
+  }
 };
 
 // 6. HELPER
@@ -84,40 +98,89 @@ const buildUserResponse = async (user) => {
   return { id: user._id, email: user.email, fullName: user.fullName, kycTier: user.kycTier, kycStatus: user.kycStatus, balances, activeCurrency: wallet.currency, walletId: wallet.walletId };
 };
 
+// 🟢 HEALTH CHECK ENDPOINT (FOR DEBUGGING)
+app.get('/api/health', (req, res) => {
+  const mongooseConnected = mongoose.connection.readyState === 1;
+  res.status(mongooseConnected ? 200 : 503).json({
+    success: mongooseConnected,
+    message: mongooseConnected ? 'CreativePay API is OPERATIONAL' : 'MongoDB not connected',
+    timestamp: new Date().toISOString(),
+    mongodbStatus: mongooseConnected ? 'Connected' : 'Disconnected',
+    serverUptime: process.uptime()
+  });
+});
+
 // 7. ROUTES - PHASE 4B
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
-    if (await User.findOne({ email })) return res.status(400).json({ success: false, message: 'User exists' });
+    if (!email || !password || !fullName) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ success: false, message: 'User exists' });
+    
     const user = await User.create({ email, password: await bcrypt.hash(password, 12), fullName });
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ success: true, user: await buildUserResponse(user), token });
-  } catch (e) { res.status(500).json({ success: false, message: 'Register failed' }); }
+  } catch (e) { 
+    console.error('Register error:', e.message);
+    res.status(500).json({ success: false, message: 'Register failed: ' + e.message }); 
+  }
 });
 
 app.post('/api/login', async (req, res) => {
   try {
-    const user = await User.findOne({ email: req.body.email });
-    if (!user ||!(await bcrypt.compare(req.body.password, user.password))) return res.status(401).json({ success: false, message: 'Invalid' });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    }
+    
+    const user = await User.findOne({ email });
+    if (!user ||!(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+    
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, user: await buildUserResponse(user), token });
-  } catch (e) { res.status(500).json({ success: false, message: 'Login failed' }); }
+  } catch (e) { 
+    console.error('Login error:', e.message);
+    res.status(500).json({ success: false, message: 'Login failed: ' + e.message }); 
+  }
 });
 
 // ✅ CRITICAL FIX: Endpoint is /api/bvn NOT /api/kyc/verify-bvn
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
-    if (!/^\d{11}$/.test(bvn)) return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
+    if (!bvn || !/^\d{11}$/.test(bvn)) {
+      return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
+    }
+    
     await User.findByIdAndUpdate(req.user.id, { bvn, kycTier: 1, kycStatus: 'verified' });
-    await Wallet.findOneAndUpdate({ userId: req.user.id }, { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } } }, { upsert: true, new: true });
+    await Wallet.findOneAndUpdate(
+      { userId: req.user.id }, 
+      { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } } }, 
+      { upsert: true, new: true }
+    );
+    
     res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
-  } catch (e) { res.status(500).json({ success: false, message: 'BVN failed' }); }
+  } catch (e) { 
+    console.error('BVN error:', e.message);
+    res.status(500).json({ success: false, message: 'BVN failed: ' + e.message }); 
+  }
 });
 
 app.get('/api/user', authMiddleware, async (req, res) => {
-  const user = await User.findById(req.user.id).select('-password');
-  res.json({ success: true, user: await buildUserResponse(user) });
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, user: await buildUserResponse(user) });
+  } catch (e) {
+    console.error('Get user error:', e.message);
+    res.status(500).json({ success: false, message: 'Failed to fetch user' });
+  }
 });
 
 // ✅ CRITICAL FIX: Serve index.html (not index.v4.html)
@@ -126,4 +189,4 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Phase 4B Compatible server on ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 CreativePay API running on port ${PORT}`));
