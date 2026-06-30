@@ -4,7 +4,27 @@
 const API_URL = 'https://creative-payroll-infrastructure.onrender.com';
 
 // ===================
-// KYC BVN VERIFICATION - BULLETPROOF
+// HELPER: FETCH WITH TIMEOUT + RETRY FOR RENDER COLD START
+// ===================
+async function fetchWithRetry(url, options, retries = 2, delay = 3000) {
+  for (let i = 0; i <= retries; i++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res; // Success, return immediately
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (i === retries || err.name !== 'AbortError') throw err; // Last try or not timeout = throw
+      await new Promise(r => setTimeout(r, delay)); // Wait 3s then retry
+    }
+  }
+}
+
+// ===================
+// KYC BVN VERIFICATION - RENDER COLD START SAFE
 // ===================
 async function verifyBVN() {
   const bvnInput = document.getElementById('bvnInput');
@@ -37,7 +57,7 @@ async function verifyBVN() {
   verifyBtn.disabled = true;
 
   try {
-    const response = await fetch(`${API_URL}/api/kyc/verify-bvn`, {
+    const response = await fetchWithRetry(`${API_URL}/api/kyc/verify-bvn`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,14 +83,17 @@ async function verifyBVN() {
       }, 2000);
 
     } else {
-      // THIS IS THE FIX: Read backend's message, not error
       bvnError.textContent = data.message || 'Verification failed';
       bvnError.style.display = 'block';
     }
 
   } catch (error) {
     console.error('BVN error:', error);
-    bvnError.textContent = 'Network error. Please try again.';
+    if (error.name === 'AbortError') {
+      bvnError.textContent = 'Server waking up. Please tap Verify again in 5s.';
+    } else {
+      bvnError.textContent = `Request failed: ${error.message}`;
+    }
     bvnError.style.display = 'block';
   } finally {
     verifyBtn.textContent = 'Verify BVN';
