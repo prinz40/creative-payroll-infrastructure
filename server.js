@@ -4,7 +4,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
@@ -20,31 +19,26 @@ for (const env of requiredEnvs) {
   }
 }
 
-console.log('✅ All required environment variables found');
+console.log('✅ All environment variables loaded');
 
-// RATES for MVP
+// RATES
 const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
 
 // 2. MIDDLEWARE
-app.use(cors({ origin: '*', credentials: true })); // Allow all origins during testing
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, message: { success: false, message: 'Too many requests' } });
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
 // 3. DATABASE
-const mongooseOptions = { 
+console.log('🔄 Connecting to MongoDB...');
+mongoose.connect(process.env.MONGODB_URI, { 
   serverSelectionTimeoutMS: 10000,
   connectTimeoutMS: 10000
-};
-
-console.log('🔄 Connecting to MongoDB...');
-mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
-  .then(() => console.log('✅ MongoDB Connected Successfully'))
-  .catch(err => { 
-    console.error('❌ MongoDB Connection Error:', err.message);
-    process.exit(1);
-  });
+})
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch(err => { console.error('❌ MongoDB Error:', err.message); process.exit(1); });
 
 // 4. MODELS
 const userSchema = new mongoose.Schema({
@@ -77,7 +71,7 @@ const transactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
-// 5. AUTH
+// 5. AUTH MIDDLEWARE
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -85,7 +79,6 @@ const authMiddleware = async (req, res, next) => {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch (err) { 
-    console.error('Auth error:', err.message);
     return res.status(401).json({ success: false, message: 'Invalid token' }); 
   }
 };
@@ -98,59 +91,51 @@ const buildUserResponse = async (user) => {
   return { id: user._id, email: user.email, fullName: user.fullName, kycTier: user.kycTier, kycStatus: user.kycStatus, balances, activeCurrency: wallet.currency, walletId: wallet.walletId };
 };
 
-// 🟢 HEALTH CHECK ENDPOINT (FOR DEBUGGING)
+// 7. HEALTH CHECK
 app.get('/api/health', (req, res) => {
-  const mongooseConnected = mongoose.connection.readyState === 1;
-  res.status(mongooseConnected ? 200 : 503).json({
-    success: mongooseConnected,
-    message: mongooseConnected ? 'CreativePay API is OPERATIONAL' : 'MongoDB not connected',
-    timestamp: new Date().toISOString(),
-    mongodbStatus: mongooseConnected ? 'Connected' : 'Disconnected',
-    serverUptime: process.uptime()
+  res.status(200).json({
+    success: true,
+    message: 'CreativePay API OPERATIONAL',
+    timestamp: new Date().toISOString()
   });
 });
 
-// 7. ROUTES - PHASE 4B
+// 8. ROUTES
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
     if (!email || !password || !fullName) {
-      return res.status(400).json({ success: false, message: 'Missing required fields' });
+      return res.status(400).json({ success: false, message: 'Missing fields' });
     }
     
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ success: false, message: 'User exists' });
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ success: false, message: 'User exists' });
     
     const user = await User.create({ email, password: await bcrypt.hash(password, 12), fullName });
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ success: true, user: await buildUserResponse(user), token });
   } catch (e) { 
-    console.error('Register error:', e.message);
-    res.status(500).json({ success: false, message: 'Register failed: ' + e.message }); 
+    console.error('Register:', e.message);
+    res.status(500).json({ success: false, message: 'Register failed' }); 
   }
 });
 
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password required' });
-    }
-    
     const user = await User.findOne({ email });
-    if (!user ||!(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ success: false, message: 'Invalid' });
     }
     
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, user: await buildUserResponse(user), token });
   } catch (e) { 
-    console.error('Login error:', e.message);
-    res.status(500).json({ success: false, message: 'Login failed: ' + e.message }); 
+    console.error('Login:', e.message);
+    res.status(500).json({ success: false, message: 'Login failed' }); 
   }
 });
 
-// ✅ CRITICAL FIX: Endpoint is /api/bvn NOT /api/kyc/verify-bvn
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
@@ -167,26 +152,39 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
     
     res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
   } catch (e) { 
-    console.error('BVN error:', e.message);
-    res.status(500).json({ success: false, message: 'BVN failed: ' + e.message }); 
+    console.error('BVN:', e.message);
+    res.status(500).json({ success: false, message: 'BVN failed' }); 
   }
 });
 
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user) return res.status(404).json({ success: false, message: 'Not found' });
     res.json({ success: true, user: await buildUserResponse(user) });
-  } catch (e) {
-    console.error('Get user error:', e.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch user' });
+  } catch (e) { 
+    console.error('User:', e.message);
+    res.status(500).json({ success: false, message: 'Failed' });
   }
 });
 
-// ✅ CRITICAL FIX: Serve index.html (not index.v4.html)
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// 9. STATIC FILES - CRITICAL
+const publicPath = path.join(__dirname, 'public');
+console.log('📁 Serving static files from:', publicPath);
+app.use(express.static(publicPath));
+
+// 10. CATCH ALL - SERVE INDEX.HTML
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 CreativePay API running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`\n🚀 CreativePay API running on http://localhost:${PORT}`);
+  console.log(`📁 Public folder: ${publicPath}`);
+  console.log(`✅ Ready to accept requests\n`);
+});
