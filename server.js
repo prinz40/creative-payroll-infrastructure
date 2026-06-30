@@ -10,16 +10,16 @@ require('dotenv').config();
 const app = express();
 app.set('trust proxy', 1);
 
-// 1. ENV VALIDATION
+// 1. ENV VALIDATION - NO MORE CRASHING
 const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
+let missingEnv = false;
 for (const env of requiredEnvs) {
   if (!process.env[env]) {
     console.error(`❌ FATAL: ${env} missing`);
-    process.exit(1);
+    missingEnv = true; // Log it, but don't exit
   }
 }
-
-console.log('✅ All environment variables loaded');
+if (!missingEnv) console.log('✅ All environment variables loaded');
 
 // RATES
 const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
@@ -31,14 +31,18 @@ app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
-// 3. DATABASE
+// 3. DATABASE - CONNECT WITHOUT KILLING THE SERVER
 console.log('🔄 Connecting to MongoDB...');
-mongoose.connect(process.env.MONGODB_URI, { 
-  serverSelectionTimeoutMS: 10000,
-  connectTimeoutMS: 10000
-})
-  .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => { console.error('❌ MongoDB Error:', err.message); process.exit(1); });
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI, { 
+    serverSelectionTimeoutMS: 30000, // 30s wait instead of 10s
+    connectTimeoutMS: 30000
+  })
+   .then(() => console.log('✅ MongoDB Connected'))
+   .catch(err => { console.error('❌ MongoDB Error:', err.message); }); // NO process.exit(1) HERE
+} else {
+  console.error('❌ MONGODB_URI not set. API will run but DB routes will fail.');
+}
 
 // 4. MODELS
 const userSchema = new mongoose.Schema({
@@ -96,6 +100,7 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'CreativePay API OPERATIONAL',
+    db: mongoose.connection.readyState === 1? 'connected' : 'disconnected',
     timestamp: new Date().toISOString()
   });
 });
@@ -104,13 +109,11 @@ app.get('/api/health', (req, res) => {
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
-    if (!email || !password || !fullName) {
+    if (!email ||!password ||!fullName) {
       return res.status(400).json({ success: false, message: 'Missing fields' });
     }
-    
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ success: false, message: 'User exists' });
-    
     const user = await User.create({ email, password: await bcrypt.hash(password, 12), fullName });
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ success: true, user: await buildUserResponse(user), token });
@@ -124,10 +127,9 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user ||!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ success: false, message: 'Invalid' });
     }
-    
     const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ success: true, user: await buildUserResponse(user), token });
   } catch (e) { 
@@ -139,17 +141,15 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
-    if (!bvn || !/^\d{11}$/.test(bvn)) {
+    if (!bvn ||!/^\d{11}$/.test(bvn)) {
       return res.status(400).json({ success: false, message: 'BVN must be 11 digits' });
     }
-    
     await User.findByIdAndUpdate(req.user.id, { bvn, kycTier: 1, kycStatus: 'verified' });
     await Wallet.findOneAndUpdate(
       { userId: req.user.id }, 
-      { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } } }, 
+      { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 } }, 
       { upsert: true, new: true }
     );
-    
     res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
   } catch (e) { 
     console.error('BVN:', e.message);
