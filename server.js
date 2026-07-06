@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
@@ -12,37 +11,27 @@ app.set('trust proxy', 1);
 
 // 1. ENV VALIDATION
 const requiredEnvs = ['PAYSTACK_SECRET_KEY', 'JWT_SECRET', 'MONGODB_URI'];
-let missingEnv = false;
-for (const env of requiredEnvs) {
-  if (!process.env[env]) {
-    console.error(`❌ FATAL: ${env} missing`);
-    missingEnv = true;
-  }
-}
-if (!missingEnv) console.log('✅ All environment variables loaded');
+requiredEnvs.forEach(env => {
+  if (!process.env[env]) console.error(`❌ FATAL: ${env} missing`);
+});
+console.log('✅ All environment variables loaded');
 
 // RATES
 const RATES = { NGN: 1, GHS: 0.085, KES: 0.85 };
 
-// 2. MIDDLEWARE
+// 2. MIDDLEWARE - API ONLY
 app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api/', limiter);
 
 // 3. DATABASE
 console.log('🔄 Connecting to MongoDB...');
-if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI, {
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000
-  })
- .then(() => console.log('✅ MongoDB Connected'))
- .catch(err => { console.error('❌ MongoDB Error:', err.message); });
-} else {
-  console.error('❌ MONGODB_URI not set. API will run but DB routes will fail.');
-}
+mongoose.connect(process.env.MONGODB_URI, {
+  serverSelectionTimeoutMS: 30000
+})
+.then(() => console.log('✅ MongoDB Connected'))
+.catch(err => console.error('❌ MongoDB Error:', err.message));
 
 // 4. MODELS
 const userSchema = new mongoose.Schema({
@@ -112,7 +101,6 @@ app.get('/', (req, res) => {
 // 8. PUBLIC ROUTES
 app.get('/api/partners/public', async (req, res) => {
   try {
-    // Return empty array for now. Add real partner logic later
     res.json({ success: true, data: [], message: 'Partners endpoint working' });
   } catch (e) {
     res.status(500).json({ success: false, message: 'Failed to fetch partners' });
@@ -189,6 +177,6 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 CreativePay API running on http://localhost:${PORT}`);
+  console.log(`\n🚀 CreativePay API running on port ${PORT}`);
   console.log(`✅ Ready to accept requests\n`);
 });
