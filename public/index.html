@@ -6,18 +6,19 @@
   <title>CreativePay - Payment Gateway</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; padding: 20px; }
     .container { background: #1e293b; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; border: 1px solid #334155; margin: 20px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
     h1 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 24px; }
     h2 { text-align: center; margin-bottom: 20px; }
-    input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #334155; }
-    input { background: #0f172a; color: #e2e8f0; }
-    button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 600; }
+    input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #334155; font-size: 16px; }
+    input { background: #0f172a; color: #e2e8f0; outline: none; }
+    input:focus { border-color: #38bdf8; }
+    button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
     button:hover { background: #1d4ed8; }
     button:disabled { background: #475569; cursor: not-allowed; }
-    .error { background: #dc2626; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; }
-    .success { background: #16a34a; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; }
-    .link { text-align: center; margin-top: 15px; color: #38bdf8; cursor: pointer; font-size: 14px; }
+    .error { background: #dc2626; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; font-size: 14px; }
+    .success { background: #16a34a; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; font-size: 14px; }
+    .link { text-align: center; margin-top: 15px; color: #38bdf8; cursor: pointer; font-size: 14px; text-decoration: underline; }
     .hidden { display: none !important; }
     .dashboard { max-width: 800px; margin: 0 auto; padding: 20px; }
     .card { background: #1e293b; padding: 24px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
@@ -38,9 +39,9 @@
     <div id="loginSection">
       <h2>Login</h2>
       <div id="loginError" class="error"></div>
-      <input type="email" id="loginEmail" placeholder="Email" />
-      <input type="password" id="loginPassword" placeholder="Password" />
-      <button onclick="handleLogin()">Login</button>
+      <input type="email" id="loginEmail" placeholder="Email" autocomplete="email" />
+      <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" />
+      <button onclick="handleLogin()" id="loginBtn">Login</button>
       <div class="link" onclick="switchToRegister()">Don't have account? Register</div>
     </div>
 
@@ -48,10 +49,10 @@
     <div id="registerSection" class="hidden">
       <h2>Register</h2>
       <div id="registerError" class="error"></div>
-      <input type="text" id="registerName" placeholder="Full Name" />
-      <input type="email" id="registerEmail" placeholder="Email" />
-      <input type="password" id="registerPassword" placeholder="Password" />
-      <button onclick="handleRegister()">Register</button>
+      <input type="text" id="registerName" placeholder="Full Name" autocomplete="name" />
+      <input type="email" id="registerEmail" placeholder="Email" autocomplete="email" />
+      <input type="password" id="registerPassword" placeholder="Password" autocomplete="new-password" />
+      <button onclick="handleRegister()" id="registerBtn">Register</button>
       <div class="link" onclick="switchToLogin()">Have account? Login</div>
     </div>
 
@@ -64,8 +65,8 @@
       <h2>BVN Verification</h2>
       <div id="bvnError" class="error"></div>
       <div id="bvnSuccess" class="success"></div>
-      <input type="text" id="bvnInput" placeholder="Enter 11-digit BVN" maxlength="11" pattern="[0-9]*" />
-      <button onclick="handleBVN()">Verify BVN</button>
+      <input type="text" id="bvnInput" placeholder="Enter 11-digit BVN" maxlength="11" pattern="[0-9]*" inputmode="numeric" />
+      <button onclick="handleBVN()" id="bvnBtn">Verify BVN</button>
       <div class="link" onclick="handleLogout()">Logout</div>
     </div>
   </div>
@@ -74,7 +75,7 @@
   <div id="dashboardSection" class="dashboard hidden">
     <div class="header">
       <h1>Dashboard</h1>
-      <button onclick="handleLogout()" style="width: auto; background: #dc2626;">Logout</button>
+      <button onclick="handleLogout()" style="width: auto; background: #dc2626; padding: 10px 20px;">Logout</button>
     </div>
 
     <div class="kyc-banner" id="kycBanner" style="display: none;">
@@ -88,14 +89,14 @@
     </div>
 
     <div class="card balance-card">
-      <div style="color: #94a3b8; margin-bottom: 8px;">Balance</div>
+      <div style="color: #94a3b8; margin-bottom: 8px;">NGN Balance</div>
       <div class="balance-amount" id="userBalance">₦0.00</div>
       <div style="font-size: 12px; margin-top: 12px; color: #64748b;" id="walletId"></div>
     </div>
   </div>
 
   <script>
-    // CRITICAL: FIXED BACKEND URL - ADDED 'all'
+    // CRITICAL: BACKEND URL - MUST MATCH YOUR RENDER URL
     const API_URL = 'https://creative-payroll-infrastructure.onrender.com/api';
     const TOKEN_KEY = 'creativepay_token';
 
@@ -118,7 +119,7 @@
       setTimeout(() => el.style.display = 'none', 3000);
     };
 
-    // API CALLS
+    // API CALLS - MATCHES server.js ROUTES
     async function apiCall(endpoint, options = {}) {
       const token = getToken();
       try {
@@ -134,6 +135,7 @@
         if (res.status === 401) {
           clearToken();
           location.reload();
+          return;
         }
 
         const data = await res.json();
@@ -147,10 +149,16 @@
 
     // AUTH FLOWS
     async function handleLogin() {
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true;
+      btn.textContent = 'Logging in...';
+
       const email = document.getElementById('loginEmail').value.trim();
       const password = document.getElementById('loginPassword').value;
       if (!email || !password) {
         showError('loginError', 'Email and password required');
+        btn.disabled = false;
+        btn.textContent = 'Login';
         return;
       }
 
@@ -164,15 +172,24 @@
         else showBVN();
       } catch (err) {
         showError('loginError', err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Login';
       }
     }
 
     async function handleRegister() {
+      const btn = document.getElementById('registerBtn');
+      btn.disabled = true;
+      btn.textContent = 'Registering...';
+
       const fullName = document.getElementById('registerName').value.trim();
       const email = document.getElementById('registerEmail').value.trim();
       const password = document.getElementById('registerPassword').value;
       if (!fullName || !email || !password) {
         showError('registerError', 'All fields required');
+        btn.disabled = false;
+        btn.textContent = 'Register';
         return;
       }
 
@@ -185,13 +202,22 @@
         showBVN();
       } catch (err) {
         showError('registerError', err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register';
       }
     }
 
     async function handleBVN() {
+      const btn = document.getElementById('bvnBtn');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
       const bvn = document.getElementById('bvnInput').value.trim();
       if (bvn.length !== 11 || !/^\d+$/.test(bvn)) {
         showError('bvnError', 'BVN must be 11 digits');
+        btn.disabled = false;
+        btn.textContent = 'Verify BVN';
         return;
       }
 
@@ -204,6 +230,9 @@
         setTimeout(() => showDashboard(data.user), 1500);
       } catch (err) {
         showError('bvnError', err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Verify BVN';
       }
     }
 
@@ -251,9 +280,10 @@
       location.reload();
     }
 
-    // INIT
+    // INIT - AUTO LOGIN CHECK
     window.addEventListener('DOMContentLoaded', async () => {
-      if (getToken()) {
+      const token = getToken();
+      if (token) {
         try {
           const data = await apiCall('/user');
           showDashboard(data.user);
