@@ -95,7 +95,7 @@ const buildUserResponse = async (user) => {
   return { id: user._id, email: user.email, fullName: user.fullName, kycTier: user.kycTier, kycStatus: user.kycStatus, balances, activeCurrency: wallet.currency, walletId: wallet.walletId };
 };
 
-// 7. HEALTH CHECK
+// 7. HEALTH CHECK + ROOT
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -105,7 +105,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 8. ROUTES
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'CreativePay API is LIVE 🔥', version: '1.0.0' });
+});
+
+// 8. PUBLIC ROUTES
+app.get('/api/partners/public', async (req, res) => {
+  try {
+    // Return empty array for now. Add real partner logic later
+    res.json({ success: true, data: [], message: 'Partners endpoint working' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Failed to fetch partners' });
+  }
+});
+
+// 9. AUTH ROUTES
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
@@ -168,23 +182,13 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   }
 });
 
-// 9. STATIC FILES
-const publicPath = path.join(__dirname, 'public');
-console.log('📁 Serving static files from:', publicPath);
-app.use(express.static(publicPath));
-
-// 10. CATCH ALL
-app.get('/', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
+// 10. 404 HANDLER - MUST BE LAST
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`\n🚀 CreativePay API running on http://localhost:${PORT}`);
-  console.log(`📁 Public folder: ${publicPath}`);
   console.log(`✅ Ready to accept requests\n`);
 });
