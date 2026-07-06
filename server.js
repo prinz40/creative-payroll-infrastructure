@@ -35,7 +35,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// 3. SERVE FRONTEND FILES - THIS IS THE FIX
+// 3. SERVE FRONTEND - THIS IS WHAT MAKES LOGIN PAGE SHOW
 app.use(express.static(path.join(__dirname)));
 
 // 4. DATABASE CONNECTION
@@ -63,11 +63,7 @@ const User = mongoose.model('User', userSchema);
 const walletSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true },
   walletId: { type: String, unique: true },
-  balances: {
-    type: Map,
-    of: Number,
-    default: { NGN: 0, GHS: 0, KES: 0 }
-  },
+  balances: { type: Map, of: Number, default: { NGN: 0, GHS: 0, KES: 0 } },
   currency: { type: String, default: 'NGN' }
 });
 const Wallet = mongoose.model('Wallet', walletSchema);
@@ -118,7 +114,6 @@ const buildUserResponse = async (user) => {
 
 // 8. API ROUTES
 
-// Health Check
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -128,7 +123,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Public Partners
 app.get('/api/partners/public', async (req, res) => {
   try {
     res.json({ success: true, data: [], message: 'Partners endpoint working' });
@@ -137,7 +131,6 @@ app.get('/api/partners/public', async (req, res) => {
   }
 });
 
-// Register
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
@@ -158,7 +151,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -174,7 +166,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// BVN Verification
 app.post('/api/bvn', authMiddleware, async (req, res) => {
   try {
     const { bvn } = req.body;
@@ -195,7 +186,6 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
   }
 });
 
-// Get Current User
 app.get('/api/user', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -207,7 +197,7 @@ app.get('/api/user', authMiddleware, async (req, res) => {
   }
 });
 
-// 9. CATCH ALL ROUTE - SEND INDEX.HTML FOR FRONTEND
+// 9. FRONTEND CATCH ALL - MUST BE LAST ROUTE
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
