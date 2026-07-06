@@ -38,8 +38,8 @@ if (process.env.MONGODB_URI) {
     serverSelectionTimeoutMS: 30000,
     connectTimeoutMS: 30000
   })
-  .then(() => console.log('✅ MongoDB Connected'))
-  .catch(err => { console.error('❌ MongoDB Error:', err.message); });
+ .then(() => console.log('✅ MongoDB Connected'))
+ .catch(err => { console.error('❌ MongoDB Error:', err.message); });
 } else {
   console.error('❌ MONGODB_URI not set. API will run but DB routes will fail.');
 }
@@ -147,7 +147,7 @@ app.post('/api/bvn', authMiddleware, async (req, res) => {
     await User.findByIdAndUpdate(req.user.id, { bvn, kycTier: 1, kycStatus: 'verified' });
     await Wallet.findOneAndUpdate(
       { userId: req.user.id },
-      { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 }},
+      { $setOnInsert: { walletId: `CPY-${Date.now()}-${req.user.id.slice(-4)}`, balances: { NGN: 0, GHS: 0, KES: 0 }}},
       { upsert: true, new: true }
     );
     res.json({ success: true, user: await buildUserResponse(await User.findById(req.user.id)) });
