@@ -95,8 +95,8 @@
   </div>
 
   <script>
-    // CRITICAL: HARDCODED BACKEND URL - NO MORE WINDOW.LOCATION.ORIGIN
-    const API_URL = 'https://creative-payroll-infrastructure.onrender.com/api';
+    // CRITICAL: FIXED BACKEND URL - ADDED 'all'
+    const API_URL = 'https://creativepayall-infrastructure.onrender.com/api';
     const TOKEN_KEY = 'creativepay_token';
 
     // HELPERS
@@ -118,11 +118,10 @@
       setTimeout(() => el.style.display = 'none', 3000);
     };
 
-    // API CALLS - WITH BETTER ERROR LOGGING
+    // API CALLS
     async function apiCall(endpoint, options = {}) {
       const token = getToken();
       try {
-        console.log(`API CALL: ${API_URL}${endpoint}`); // Debug line
         const res = await fetch(`${API_URL}${endpoint}`, {
           ...options,
           headers: {
@@ -141,7 +140,7 @@
         if (!res.ok) throw new Error(data.message || 'Request failed');
         return data;
       } catch (err) {
-        console.error('API ERROR:', err); // Debug line
+        console.error('API ERROR:', err);
         throw new Error(err.message || 'Network error. Check backend URL.');
       }
     }
@@ -237,7 +236,6 @@
       document.getElementById('userName').textContent = user.fullName || 'N/A';
       document.getElementById('userStatus').textContent = user.kycTier >= 1 ? '✅ KYC Verified' : '⚠️ Pending';
 
-      // SAFE DEFAULTS - NO MORE "Cannot read NGN"
       const balances = user.balances || { NGN: 0, GHS: 0, KES: 0 };
       const ngn = Number(balances.NGN ?? 0);
       document.getElementById('userBalance').textContent = `₦${ngn.toFixed(2)}`;
@@ -255,7 +253,6 @@
 
     // INIT
     window.addEventListener('DOMContentLoaded', async () => {
-      console.log('API_URL:', API_URL); // Debug line
       if (getToken()) {
         try {
           const data = await apiCall('/user');
