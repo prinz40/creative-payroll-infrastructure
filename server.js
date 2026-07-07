@@ -110,8 +110,6 @@ app.get('/api/user', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false }); }
 });
 
-// CATCH ALL
-app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
 // CATCH ALL
 app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')) });
