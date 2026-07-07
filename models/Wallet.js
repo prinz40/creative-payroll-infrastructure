@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
 const walletSchema = new mongoose.Schema({
   userId: { 
@@ -10,35 +11,68 @@ const walletSchema = new mongoose.Schema({
   walletId: { 
     type: String, 
     unique: true, 
-    required: true 
+    required: true,
+    default: () => `CPY-${Date.now()}-${Math.random().toString(36).substr(2,4).toUpperCase()}`
   },
-  // ✅ FIXED: Multi-currency support with Map (matches server.js)
+  // ✅ PROFESSIONAL: Multi-currency support. Matches your old app + new currencies
   balances: {
     type: Map,
     of: Number,
-    default: { 'NGN': 0, 'GHS': 0, 'KES': 0 }
+    default: { 
+      'NGN': 0, 
+      'GHS': 0, 
+      'KES': 0,
+      'USD': 0,
+      'EUR': 0,
+      'GBP': 0
+    }
   },
-  currency: {
+  defaultCurrency: { // renamed from currency to avoid confusion
     type: String,
-    default: 'NGN'
+    default: 'NGN',
+    enum: ['NGN', 'GHS', 'KES', 'USD', 'EUR', 'GBP']
   },
   status: { 
     type: String, 
     default: 'active', 
     enum: ['active', 'frozen', 'closed'] 
+  },
+  kycStatus: {
+    type: String,
+    default: 'KYC TIER 1 VERIFIED',
+    enum: ['UNVERIFIED', 'KYC TIER 1 VERIFIED', 'KYC TIER 2 VERIFIED']
   }
 }, { timestamps: true });
+
 
 // HELPER: Get balance for any currency. Safe fallback to 0
 walletSchema.methods.getBalance = function(currency = 'NGN') {
   return this.balances.get(currency) || 0;
 };
 
-// HELPER: Add money to a currency
-walletSchema.methods.addBalance = function(currency, amount) {
+// HELPER: Add money to a currency - with validation
+walletSchema.methods.addBalance = async function(currency, amount) {
+  if(amount <= 0) throw new Error('Amount must be greater than 0');
   const current = this.getBalance(currency);
-  this.balances.set(currency, current + amount);
-  return this.save();
+  this.balances.set(currency, parseFloat((current + amount).toFixed(2)));
+  return await this.save();
 };
+
+// HELPER: Deduct money from a currency - with validation
+walletSchema.methods.deductBalance = async function(currency, amount) {
+  const current = this.getBalance(currency);
+  if(current < amount) throw new Error(`Insufficient ${currency} balance`);
+  this.balances.set(currency, parseFloat((current - amount).toFixed(2)));
+  return await this.save();
+};
+
+// HELPER: Get all balances as object for frontend
+walletSchema.methods.getAllBalances = function() {
+  return Object.fromEntries(this.balances);
+};
+
+// Index for faster lookups
+walletSchema.index({ walletId: 1 });
+walletSchema.index({ userId: 1 });
 
 module.exports = mongoose.model('Wallet', walletSchema);
