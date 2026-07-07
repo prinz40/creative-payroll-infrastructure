@@ -1,185 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreativePay - Payment Gateway</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; padding: 20px; }
-    .container { background: #1e293b; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; border: 1px solid #334155; margin: 20px auto; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    h1 { color: #38bdf8; text-align: center; margin-bottom: 20px; font-size: 24px; }
-    h2 { text-align: center; margin-bottom: 20px; }
-    h3 { margin-bottom: 15px; color: #38bdf8; }
-    input, button, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: 1px solid #334155; font-size: 16px; }
-    input { background: #0f172a; color: #e2e8f0; outline: none; }
-    input:focus { border-color: #38bdf8; }
-    button { background: #2563eb; color: white; border: none; cursor: pointer; font-weight: 600; transition: 0.2s; }
-    button:hover { background: #1d4ed8; }
-    button:disabled { background: #475569; cursor: not-allowed; }
-    .error { background: #dc2626; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; font-size: 14px; }
-    .success { background: #16a34a; color: white; padding: 10px; border-radius: 6px; margin: 10px 0; text-align: center; display: none; font-size: 14px; }
-    .link { text-align: center; margin-top: 15px; color: #38bdf8; cursor: pointer; font-size: 14px; text-decoration: underline; }
-    .hidden { display: none !important; }
-    .dashboard { max-width: 900px; margin: 0 auto; padding: 20px; }
-    .card { background: #1e293b; padding: 24px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 10px; }
-    .balance-card { text-align: center; }
-    .balance-amount { font-size: 36px; font-weight: 700; color: #4ade80; }
-    .kyc-banner { background: #166534; color: #4ade80; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-    .kyc-warning { background: #854d0e; color: #facc15; padding: 12px; border-radius: 6px; margin-bottom: 20px; text-align: center; }
-    .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
-    .actions button { padding: 14px; font-size: 15px; }
-    .btn-success { background: #16a34a; }
-    .btn-success:hover { background: #15803d; }
-    .btn-warning { background: #f59e0b; }
-    .btn-warning:hover { background: #d97706; }
-    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-    .modal-content { background: #1e293b; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; border: 1px solid #334155; }
-    .close-modal { float: right; font-size: 24px; cursor: pointer; color: #94a3b8; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreativePay - Digital Wallet</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+body { background: #f5f5f5; }
+.container { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
+.btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
+.card { background: white; padding: 15px; margin: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.hidden { display: none; }
+.balance { font-size: 32px; font-weight: bold; color: #667eea; }
+</style>
 </head>
 <body>
-  <div id="authForm" class="container">
-    <h1>CreativePay</h1>
-    <div id="loginSection">
-      <h2>Login</h2>
-      <div id="loginError" class="error"></div>
-      <input type="email" id="loginEmail" placeholder="Email" required />
-      <input type="password" id="loginPassword" placeholder="Password" required />
-      <button onclick="handleLogin()" id="loginBtn">Login</button>
-      <div class="link" onclick="switchToRegister()">Don't have account? Register</div>
-    </div>
-    <div id="registerSection" class="hidden">
-      <h2>Register</h2>
-      <div id="registerError" class="error"></div>
-      <input type="text" id="registerName" placeholder="Full Name" required />
-      <input type="email" id="registerEmail" placeholder="Email" required />
-      <input type="password" id="registerPassword" placeholder="Password - Min 6 chars" required />
-      <button onclick="handleRegister()" id="registerBtn">Register</button>
-      <div class="link" onclick="switchToLogin()">Have account? Login</div>
-    </div>
-    <div id="bvnSection" class="hidden">
-      <div class="kyc-warning"><strong>KYC REQUIRED</strong><br>Verify your BVN to unlock wallet</div>
-      <h2>BVN Verification</h2>
-      <div id="bvnError" class="error"></div>
-      <div id="bvnSuccess" class="success"></div>
-      <input type="text" id="bvnInput" placeholder="Enter 11-digit BVN" maxlength="11" inputmode="numeric" required />
-      <button onclick="handleBVN()" id="bvnBtn">Verify BVN</button>
-      <div class="link" onclick="handleLogout()">Logout</div>
-    </div>
+<div class="container">
+  <div class="header"><h1>CreativePay</h1></div>
+  
+  <div id="authSection" class="card">
+    <h2 id="authTitle">Login</h2>
+    <input type="email" id="email" class="input" placeholder="Email">
+    <input type="password" id="password" class="input" placeholder="Password">
+    <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
+    <button class="btn" id="authBtn" onclick="handleAuth()">Login</button>
+    <p style="text-align:center; margin-top:10px;">
+      <a href="#" onclick="switchToRegister()">Don't have an account? Register</a>
+    </p>
   </div>
 
-  <div id="dashboardSection" class="dashboard hidden">
-    <div class="header">
-      <h1>CreativePay Dashboard</h1>
-      <button onclick="handleLogout()" style="width: auto; background: #dc2626; padding: 10px 20px;">Logout</button>
-    </div>
-    <div class="kyc-banner" id="kycBanner">✅ KYC VERIFIED - Welcome!</div>
+  <div id="bvnSection" class="card hidden">
+    <h2>Verify BVN</h2>
+    <input type="text" id="bvn" class="input" placeholder="11 Digit BVN" maxlength="11">
+    <button class="btn" onclick="submitBVN()">Verify BVN</button>
+  </div>
+
+  <div id="dashboard" class="hidden">
     <div class="card">
-      <div>Email: <strong id="userEmail"></strong></div>
-      <div>Name: <strong id="userName"></strong></div>
-      <div>Status: <strong id="userStatus"></strong></div>
+      <p>Wallet Balance</p>
+      <div class="balance" id="balance">₦0.00</div>
     </div>
-    <div class="card balance-card">
-      <div style="color: #94a3b8; margin-bottom: 8px;">NGN Balance</div>
-      <div class="balance-amount" id="userBalance">₦0.00</div>
-      <div style="font-size: 12px; margin-top: 12px; color: #64748b;" id="walletId"></div>
-      <div class="actions">
-        <button class="btn-success" onclick="openModal('fundModal')">+ Fund Wallet</button>
-        <button class="btn-warning" onclick="openModal('transferModal')">Send Money</button>
-        <button onclick="openModal('airtimeModal')">Buy Airtime</button>
-      </div>
+    <div class="card">
+      <h3>Fund Wallet</h3>
+      <input type="number" id="fundAmount" class="input" placeholder="Amount">
+      <button class="btn" onclick="fundWallet()">Fund with Paystack</button>
     </div>
+    <div class="card">
+      <h3>Send Money</h3>
+      <input type="email" id="transferEmail" class="input" placeholder="Recipient Email">
+      <input type="number" id="transferAmount" class="input" placeholder="Amount">
+      <button class="btn" onclick="transferMoney()">Send</button>
+    </div>
+    <div class="card">
+      <h3>Buy Airtime</h3>
+      <input type="text" id="airtimeNumber" class="input" placeholder="Phone Number">
+      <input type="number" id="airtimeAmount" class="input" placeholder="Amount">
+      <input type="text" id="airtimeNetwork" class="input" placeholder="Network">
+      <button class="btn" onclick="buyAirtime()">Buy Airtime</button>
+    </div>
+    <button class="btn" style="background:#ff4757" onclick="handleLogout()">Logout</button>
   </div>
+</div>
 
-  <div id="fundModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeModal('fundModal')">&times;</span><h3>Fund Wallet</h3><div id="fundError" class="error"></div><input type="number" id="fundAmount" placeholder="Enter Amount" min="100" /><button onclick="fundWallet()">Proceed</button></div></div>
-  <div id="transferModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeModal('transferModal')">&times;</span><h3>Transfer Money</h3><div id="transferError" class="error"></div><input type="email" id="transferEmail" placeholder="Recipient Email" /><input type="number" id="transferAmount" placeholder="Amount" min="100" /><button onclick="transferMoney()">Send</button></div></div>
-  <div id="airtimeModal" class="modal"><div class="modal-content"><span class="close-modal" onclick="closeModal('airtimeModal')">&times;</span><h3>Buy Airtime</h3><div id="airtimeError" class="error"></div><input type="tel" id="airtimeNumber" placeholder="Phone Number" /><input type="number" id="airtimeAmount" placeholder="Amount" min="50" /><select id="airtimeNetwork"><option value="">Select Network</option><option value="mtn">MTN</option><option value="airtel">Airtel</option><option value="glo">Glo</option><option value="9mobile">9Mobile</option></select><button onclick="buyAirtime()">Buy Now</button></div></div>
+<script>
+const API_URL = '/api';
+let currentUser = null;
 
-  <script>
-    const API_URL = 'https://creative-payroll-infrastructure.onrender.com/api';
-    const TOKEN_KEY = 'creativepay_token';
+function getToken() { return localStorage.getItem('token'); }
+function setToken(token) { localStorage.setItem('token', token); }
+function clearToken() { localStorage.removeItem('token'); }
 
-    const getToken = () => localStorage.getItem(TOKEN_KEY);
-    const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
-    const clearToken = () => localStorage.removeItem(TOKEN_KEY);
-    const showError = (id, msg) => { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 5000); };
-    const showSuccess = (id, msg) => { const el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 3000); };
-    const openModal = (id) => document.getElementById(id).style.display = 'flex';
-    const closeModal = (id) => document.getElementById(id).style.display = 'none';
+async function apiCall(endpoint, method = 'GET', data = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  
+  const res = await fetch(API_URL + endpoint, {
+    method, headers, body: data ? JSON.stringify(data) : null
+  });
+  return res.json();
+}
 
-    async function apiCall(endpoint, options = {}) {
-      const token = getToken();
-      try {
-        const res = await fetch(`${API_URL}${endpoint}`, {
-          ...options,
-          headers: { 'Content-Type': 'application/json', ...(token && { 'Authorization': `Bearer ${token}` }), ...options.headers }
-        });
-        if (res.status === 401) { clearToken(); location.reload(); return; }
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Request failed');
-        return data;
-      } catch (err) { console.error('API ERROR:', err); throw new Error(err.message || 'Network error'); }
-    }
+async function handleAuth() {
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true; btn.textContent = 'Please wait...';
+  try {
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const isRegister = document.getElementById('fullName').classList.contains('hidden') === false;
+    const endpoint = isRegister ? '/register' : '/login';
+    const data = isRegister ? { email, password, fullName: document.getElementById('fullName').value } : { email, password };
+    
+    const result = await apiCall(endpoint, 'POST', data);
+    if (result.success) {
+      setToken(result.token);
+      currentUser = result.user;
+      if (result.user.kycTier === 0) showBVN();
+      else showDashboard(result.user);
+    } else alert(result.message);
+  } catch(e) { alert('Error: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = 'Login'; }
+}
 
-    async function handleLogin() {
-      const btn = document.getElementById('loginBtn'); btn.disabled = true; btn.textContent = 'Logging in...';
-      const email = document.getElementById('loginEmail').value.trim();
-      const password = document.getElementById('loginPassword').value;
-      if (!email || !password) { showError('loginError', 'Email and password required'); btn.disabled = false; btn.textContent = 'Login'; return; }
-      try {
-        const data = await apiCall('/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-        setToken(data.token);
-        if (data.user.kycTier >= 1) showDashboard(data.user); else showBVN();
-      } catch (err) { showError('loginError', err.message); } 
-      finally { btn.disabled = false; btn.textContent = 'Login'; }
-    }
+async function submitBVN() {
+  const bvn = document.getElementById('bvn').value;
+  const result = await apiCall('/bvn', 'POST', { bvn });
+  if (result.success) showDashboard(result.user);
+  else alert(result.message);
+}
 
-    async function handleRegister() {
-      const btn = document.getElementById('registerBtn'); btn.disabled = true; btn.textContent = 'Registering...';
-      const fullName = document.getElementById('registerName').value.trim();
-      const email = document.getElementById('registerEmail').value.trim();
-      const password = document.getElementById('registerPassword').value;
-      if (!fullName || !email || !password) { showError('registerError', 'All fields required'); btn.disabled = false; btn.textContent = 'Register'; return; }
-      if (password.length < 6) { showError('registerError', 'Password must be at least 6 characters'); btn.disabled = false; btn.textContent = 'Register'; return; }
-      try {
-        const data = await apiCall('/register', { method: 'POST', body: JSON.stringify({ fullName, email, password }) });
-        setToken(data.token); showBVN();
-      } catch (err) { showError('registerError', err.message); } 
-      finally { btn.disabled = false; btn.textContent = 'Register'; }
-    }
+async function fundWallet() {
+  const amount = document.getElementById('fundAmount').value;
+  const result = await apiCall('/wallet/fund', 'POST', { amount });
+  if (result.success) window.location.href = result.authorization_url;
+  else alert(result.message);
+}
 
-    async function handleBVN() {
-      const btn = document.getElementById('bvnBtn'); btn.disabled = true; btn.textContent = 'Verifying...';
-      const bvn = document.getElementById('bvnInput').value.trim();
-      if (bvn.length !== 11 || !/^\d+$/.test(bvn)) { showError('bvnError', 'BVN must be 11 digits'); btn.disabled = false; btn.textContent = 'Verify BVN'; return; }
-      try {
-        const data = await apiCall('/bvn', { method: 'POST', body: JSON.stringify({ bvn }) });
-        showSuccess('bvnSuccess', '✅ BVN verified! Loading dashboard...');
-        setTimeout(() => showDashboard(data.user), 1500);
-      } catch (err) { showError('bvnError', err.message); } 
-      finally { btn.disabled = false; btn.textContent = 'Verify BVN'; }
-    }
+async function transferMoney() {
+  const email = document.getElementById('transferEmail').value;
+  const amount = document.getElementById('transferAmount').value;
+  const result = await apiCall('/wallet/transfer', 'POST', { email, amount });
+  alert(result.message);
+  if (result.success) refreshUser();
+}
 
-    async function fundWallet() { const amount = document.getElementById('fundAmount').value; if (!amount || amount < 100) { showError('fundError', 'Min amount is ₦100'); return; } try { await apiCall('/wallet/fund', { method: 'POST', body: JSON.stringify({ amount }) }); showSuccess('fundError', 'Payment link sent'); closeModal('fundModal'); } catch (err) { showError('fundError', err.message); }
-    async function transferMoney() { const email = document.getElementById('transferEmail').value; const amount = document.getElementById('transferAmount').value; if (!email || !amount) { showError('transferError', 'All fields required'); return; } try { await apiCall('/wallet/transfer', { method: 'POST', body: JSON.stringify({ email, amount }) }); showSuccess('transferError', 'Transfer successful'); closeModal('transferModal'); refreshUser(); } catch (err) { showError('transferError', err.message); } }
-    async function buyAirtime() { const number = document.getElementById('airtimeNumber').value; const amount = document.getElementById('airtimeAmount').value; const network = document.getElementById('airtimeNetwork').value; if (!number || !amount || !network) { showError('airtimeError', 'All fields required'); return; } try { await apiCall('/wallet/airtime', { method: 'POST', body: JSON.stringify({ number, amount, network }) }); showSuccess('airtimeError', 'Airtime purchased'); closeModal('airtimeModal'); refreshUser(); } catch (err) { showError('airtimeError', err.message); } }
-    async function refreshUser() { const data = await apiCall('/user'); showDashboard(data.user); }
+async function buyAirtime() {
+  const number = document.getElementById('airtimeNumber').value;
+  const amount = document.getElementById('airtimeAmount').value;
+  const network = document.getElementById('airtimeNetwork').value;
+  const result = await apiCall('/wallet/airtime', 'POST', { number, amount, network });
+  alert(result.message);
+  if (result.success) refreshUser();
+}
 
-    function switchToRegister() { document.getElementById('loginSection').classList.add('hidden'); document.getElementById('registerSection').classList.remove('hidden'); document.getElementById('bvnSection').classList.add('hidden'); }
-    function switchToLogin() { document.getElementById('loginSection').classList.remove('hidden'); document.getElementById('registerSection').classList.add('hidden'); document.getElementById('bvnSection').classList.add('hidden'); }
-    function showBVN() { document.getElementById('authForm').classList.remove('hidden'); document.getElementById('dashboardSection').classList.add('hidden'); document.getElementById('loginSection').classList.add('hidden'); document.getElementById('registerSection').classList.add('hidden'); document.getElementById('bvnSection').classList.remove('hidden'); }
-    function showDashboard(user) { document.getElementById('authForm').classList.add('hidden'); document.getElementById('dashboardSection').classList.remove('hidden'); document.getElementById('userEmail').textContent = user.email || 'N/A'; document.getElementById('userName').textContent = user.fullName || 'N/A'; document.getElementById('userStatus').textContent = user.kycTier >= 1 ? '✅ KYC Verified' : '⚠️ Pending'; const balances = user.balances || { NGN: 0 }; const ngn = Number(balances.NGN ?? 0); document.getElementById('userBalance').textContent = `₦${ngn.toFixed(2)}`; document.getElementById('walletId').textContent = `Wallet: ${user.walletId || 'N/A'}`; document.getElementById('kycBanner').style.display = user.kycTier >= 1 ? 'block' : 'none'; }
-    function handleLogout() { clearToken(); location.reload(); }
+async function refreshUser() {
+  const data = await apiCall('/user');
+  if (data.success) showDashboard(data.user);
+}
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      const token = getToken();
-      if (token) {
-        try { const data = await apiCall('/user'); showDashboard(data.user); } 
-        catch { clearToken(); switchToLogin(); document.getElementById('authForm').classList.remove('hidden'); }
-      } else { switchToLogin(); document.getElementById('authForm').classList.remove('hidden'); }
-    });
-  </script>
+function switchToRegister() {
+  document.getElementById('authTitle').textContent = 'Register';
+  document.getElementById('authBtn').textContent = 'Register';
+  document.getElementById('fullName').classList.remove('hidden');
+  document.querySelector('#authSection a').onclick = switchToLogin;
+  document.querySelector('#authSection a').textContent = 'Already have an account? Login';
+}
+
+function switchToLogin() {
+  document.getElementById('authTitle').textContent = 'Login';
+  document.getElementById('authBtn').textContent = 'Login';
+  document.getElementById('fullName').classList.add('hidden');
+  document.querySelector('#authSection a').onclick = switchToRegister;
+  document.querySelector('#authSection a').textContent = 'Don\'t have an account? Register';
+}
+
+function showBVN() {
+  document.getElementById('authSection').classList.add('hidden');
+  document.getElementById('bvnSection').classList.remove('hidden');
+}
+
+function showDashboard(user) {
+  currentUser = user;
+  document.getElementById('authSection').classList.add('hidden');
+  document.getElementById('bvnSection').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('balance').textContent = `₦${(user.balances.NGN || 0).toLocaleString()}`;
+}
+
+function handleLogout() {
+  clearToken();
+  location.reload();
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const token = getToken();
+  if (token) {
+    try {
+      const data = await apiCall('/user');
+      if (data.success) showDashboard(data.user);
+      else { clearToken(); switchToLogin(); }
+    } catch { clearToken(); switchToLogin(); }
+  }
+});
+</script>
 </body>
 </html>
