@@ -23,6 +23,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // SERVE FRONTEND
 app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // DB CONNECT
 mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 30000 })
