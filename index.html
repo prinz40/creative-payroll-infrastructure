@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CreativePay - Digital Wallet</title>
+<title>CreativePay - Global Digital Wallet</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
 body { background: #f5f5f5; }
@@ -11,16 +11,20 @@ body { background: #f5f5f5; }
 .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
 .btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
+.input, .select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
 .card { background: white; padding: 15px; margin: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .hidden { display: none; }
-.balance { font-size: 32px; font-weight: bold; color: #667eea; }
+.balance { font-size: 28px; font-weight: bold; color: #667eea; }
+.currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.currency-card { background: #f0f4ff; padding: 10px; border-radius: 8px; text-align: center; }
+.txn { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+.success { color: #2ed573; } .pending { color: #ffa502; }
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header"><h1>CreativePay</h1></div>
-  
+  <div class="header"><h1>CreativePay</h1><p style="font-size:12px">Beat Payoneer + Wise 💪</p></div>
+
   <div id="authSection" class="card">
     <h2 id="authTitle">Login</h2>
     <input type="email" id="email" class="input" placeholder="Email">
@@ -40,27 +44,58 @@ body { background: #f5f5f5; }
 
   <div id="dashboard" class="hidden">
     <div class="card">
-      <p>Wallet Balance</p>
-      <div class="balance" id="balance">₦0.00</div>
+      <h3 id="userName">Welcome</h3>
+      <p id="userEmail" style="color:gray; font-size:14px"></p>
     </div>
+
+    <div class="card">
+      <h3>Multi-Currency Wallet</h3>
+      <div class="currency-grid" id="balancesGrid"></div>
+    </div>
+
     <div class="card">
       <h3>Fund Wallet</h3>
       <input type="number" id="fundAmount" class="input" placeholder="Amount">
+      <select id="fundCurrency" class="select">
+        <option value="NGN">NGN - Nigerian Naira</option>
+        <option value="USD">USD - US Dollar</option>
+        <option value="EUR">EUR - Euro</option>
+        <option value="GBP">GBP - British Pound</option>
+      </select>
       <button class="btn" onclick="fundWallet()">Fund with Paystack</button>
     </div>
+
     <div class="card">
       <h3>Send Money</h3>
       <input type="email" id="transferEmail" class="input" placeholder="Recipient Email">
       <input type="number" id="transferAmount" class="input" placeholder="Amount">
+      <select id="transferCurrency" class="select">
+        <option value="NGN">NGN</option>
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+        <option value="GBP">GBP</option>
+      </select>
       <button class="btn" onclick="transferMoney()">Send</button>
     </div>
+
     <div class="card">
       <h3>Buy Airtime</h3>
       <input type="text" id="airtimeNumber" class="input" placeholder="Phone Number">
       <input type="number" id="airtimeAmount" class="input" placeholder="Amount">
-      <input type="text" id="airtimeNetwork" class="input" placeholder="Network">
+      <select id="airtimeNetwork" class="select">
+        <option value="MTN">MTN</option>
+        <option value="AIRTEL">AIRTEL</option>
+        <option value="GLO">GLO</option>
+        <option value="9MOBILE">9MOBILE</option>
+      </select>
       <button class="btn" onclick="buyAirtime()">Buy Airtime</button>
     </div>
+
+    <div class="card">
+      <h3>Transaction History</h3>
+      <div id="txnList">Loading...</div>
+    </div>
+
     <button class="btn" style="background:#ff4757" onclick="handleLogout()">Logout</button>
   </div>
 </div>
@@ -77,10 +112,7 @@ async function apiCall(endpoint, method = 'GET', data = null) {
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  
-  const res = await fetch(API_URL + endpoint, {
-    method, headers, body: data ? JSON.stringify(data) : null
-  });
+  const res = await fetch(API_URL + endpoint, { method, headers, body: data ? JSON.stringify(data) : null });
   return res.json();
 }
 
@@ -95,26 +127,28 @@ async function handleAuth() {
     const data = isRegister ? { email, password, fullName: document.getElementById('fullName').value } : { email, password };
     
     const result = await apiCall(endpoint, 'POST', data);
+    alert(result.message); // WELCOME NOTE FROM SERVER
     if (result.success) {
       setToken(result.token);
       currentUser = result.user;
       if (result.user.kycTier === 0) showBVN();
       else showDashboard(result.user);
-    } else alert(result.message);
+    }
   } catch(e) { alert('Error: ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = 'Login'; }
+  finally { btn.disabled = false; btn.textContent = isRegister ? 'Register' : 'Login'; }
 }
 
 async function submitBVN() {
   const bvn = document.getElementById('bvn').value;
   const result = await apiCall('/bvn', 'POST', { bvn });
+  alert(result.message);
   if (result.success) showDashboard(result.user);
-  else alert(result.message);
 }
 
 async function fundWallet() {
   const amount = document.getElementById('fundAmount').value;
-  const result = await apiCall('/wallet/fund', 'POST', { amount });
+  const currency = document.getElementById('fundCurrency').value;
+  const result = await apiCall('/wallet/fund', 'POST', { amount, currency });
   if (result.success) window.location.href = result.authorization_url;
   else alert(result.message);
 }
@@ -122,9 +156,10 @@ async function fundWallet() {
 async function transferMoney() {
   const email = document.getElementById('transferEmail').value;
   const amount = document.getElementById('transferAmount').value;
-  const result = await apiCall('/wallet/transfer', 'POST', { email, amount });
+  const currency = document.getElementById('transferCurrency').value;
+  const result = await apiCall('/wallet/transfer', 'POST', { email, amount, currency });
   alert(result.message);
-  if (result.success) refreshUser();
+  if (result.success) { refreshUser(); loadTransactions(); }
 }
 
 async function buyAirtime() {
@@ -133,12 +168,31 @@ async function buyAirtime() {
   const network = document.getElementById('airtimeNetwork').value;
   const result = await apiCall('/wallet/airtime', 'POST', { number, amount, network });
   alert(result.message);
-  if (result.success) refreshUser();
+  if (result.success) { refreshUser(); loadTransactions(); }
 }
 
 async function refreshUser() {
   const data = await apiCall('/user');
   if (data.success) showDashboard(data.user);
+}
+
+async function loadTransactions() {
+  const data = await apiCall('/transactions');
+  if (data.success) {
+    const list = document.getElementById('txnList');
+    if (data.transactions.length === 0) { list.innerHTML = 'No transactions yet'; return; }
+    list.innerHTML = data.transactions.map(t => `
+      <div class="txn">
+        <div>
+          <b>${t.type.replace('_', ' ').toUpperCase()}</b><br>
+          <small>${new Date(t.createdAt).toLocaleDateString()}</small>
+        </div>
+        <div class="${t.status}">
+          ${t.status === 'success' ? '+' : ''}${t.amount} ${t.currency}
+        </div>
+      </div>
+    `).join('');
+  }
 }
 
 function switchToRegister() {
@@ -167,7 +221,19 @@ function showDashboard(user) {
   document.getElementById('authSection').classList.add('hidden');
   document.getElementById('bvnSection').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
-  document.getElementById('balance').textContent = `₦${(user.balances.NGN || 0).toLocaleString()}`;
+  document.getElementById('userName').textContent = `Welcome, ${user.fullName}`;
+  document.getElementById('userEmail').textContent = user.email;
+  
+  // MULTI CURRENCY BALANCES
+  const grid = document.getElementById('balancesGrid');
+  grid.innerHTML = Object.keys(user.balances).map(cur => `
+    <div class="currency-card">
+      <small>${cur}</small>
+      <div class="balance">${user.balances[cur].toLocaleString()}</div>
+    </div>
+  `).join('');
+  
+  loadTransactions();
 }
 
 function handleLogout() {
