@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-const axios = require('axios'); // ADDED FOR PAYSTACK
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -24,7 +24,6 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
 
 // SERVE FRONTEND
 app.use(express.static(path.join(__dirname)));
-app.use(express.static(path.join(__dirname, 'public')));
 
 // DB CONNECT
 mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 30000 })
@@ -113,66 +112,46 @@ app.get('/api/user', auth, async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// ===== NEW WALLET ROUTES =====
-
-// 1. FUND WALLET - PAYSTACK
+// WALLET ROUTES
 app.post('/api/wallet/fund', auth, async (req, res) => {
   try {
     const { amount } = req.body;
     if (!amount || amount < 100) return res.status(400).json({ success: false, message: 'Min amount is ₦100' });
-    
     const user = await User.findById(req.user.id);
     const response = await axios.post('https://api.paystack.co/transaction/initialize', {
-      email: user.email,
-      amount: amount * 100, // Paystack uses kobo
-      currency: 'NGN',
-      metadata: { userId: user._id }
-    }, {
-      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
-    });
-    
-    res.json({ success: true, authorization_url: response.data.data.authorization_url });
+      email: user.email, amount: amount * 100, currency: 'NGN', metadata: { userId: user._id }
+    }, { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } });
+    res.json({ success: true, authorization_url: response.data.authorization_url });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// 2. TRANSFER MONEY
 app.post('/api/wallet/transfer', auth, async (req, res) => {
   try {
     const { email, amount } = req.body;
     const amt = Number(amount);
     if (!email ||!amt || amt < 100) return res.status(400).json({ success: false, message: 'Invalid amount or email' });
-    
     const senderWallet = await Wallet.findOne({ userId: req.user.id });
     const recipient = await User.findOne({ email: email.toLowerCase() });
     if (!recipient) return res.status(404).json({ success: false, message: 'Recipient not found' });
     const recipientWallet = await Wallet.findOne({ userId: recipient._id });
-    
     if ((senderWallet.balances.get('NGN') || 0) < amt) return res.status(400).json({ success: false, message: 'Insufficient balance' });
-    
     senderWallet.balances.set('NGN', (senderWallet.balances.get('NGN') || 0) - amt);
     recipientWallet.balances.set('NGN', (recipientWallet.balances.get('NGN') || 0) + amt);
-    
     await senderWallet.save();
     await recipientWallet.save();
-    
     res.json({ success: true, message: 'Transfer successful' });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// 3. BUY AIRTIME
 app.post('/api/wallet/airtime', auth, async (req, res) => {
   try {
     const { number, amount, network } = req.body;
     const amt = Number(amount);
     if (!number ||!amt ||!network) return res.status(400).json({ success: false, message: 'All fields required' });
-    
     const wallet = await Wallet.findOne({ userId: req.user.id });
     if ((wallet.balances.get('NGN') || 0) < amt) return res.status(400).json({ success: false, message: 'Insufficient balance' });
-    
-    // TODO: Integrate with VTU API here
     wallet.balances.set('NGN', (wallet.balances.get('NGN') || 0) - amt);
     await wallet.save();
-    
     res.json({ success: true, message: `₦${amt} airtime sent to ${number}` });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
