@@ -113,5 +113,14 @@ app.get('/api/user', auth, async (req, res) => {
 // CATCH ALL
 app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 
+// CATCH ALL
+app.get('*', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')) });
+
+// ERROR HANDLER - ADD THIS
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: err.message });
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`🚀 Running on port ${PORT}`));
