@@ -9,12 +9,9 @@ const crypto = require('crypto');
 
 const app = express();
 
-// Set trust proxy configuration for proper operation behind Render's Nginx layer
 app.set('trust proxy', 1);
-
 app.use(express.json());
 
-// Enable CORS cleanly to allow API access securely
 app.use(cors({
   origin: ['https://creative-payroll.onrender.com', 'http://localhost:3000'],
   credentials: true
@@ -22,7 +19,6 @@ app.use(cors({
 
 app.use(express.static('.'));
 
-// Setup global rate limiter to counter script attacks on endpoints
 const limiter = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
   max: 100,
@@ -30,22 +26,15 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Establish database connection
 mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('✅ MongoDB Database Connected Successfully'))
 .catch(err => console.error('❌ DB Connection Error: ', err));
 
-
-// Import Models
+// Shortened to prevent mobile layout line wrap crashes
 const Wallet = require('./models/Wallet');
-const User = require('./User');
-const Transaction = require('./Transaction');
+const User = require('./models/User');
+const Txn = require('./models/Transaction');
 
-
-
-// ===================
-// MIDDLEWARES
-// ===================
 const auth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -60,16 +49,13 @@ const auth = (req, res, next) => {
   }
 };
 
-// ===================
-// AUTH ROUTES
-// ===================
 app.post('/api/register', async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
     const { email, password, name } = req.body;
     if (!email || !password || !name) {
-      return res.status(400).json({ success: false, message: 'All registration fields are required' });
+      return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
     const existing = await User.findOne({ email }).session(session);
@@ -78,18 +64,13 @@ app.post('/api/register', async (req, res) => {
     }
 
     const hashed = await bcrypt.hash(password, 10);
-    
-    // Save to cleaned up User model
     const [user] = await User.create([{ name, email, password: hashed }], { session });
-
-    // Create the associated multi-currency wallet safely within transaction scope
-    const wallet = await Wallet.create([{ userId: user._id }], { session });
+    await Wallet.create([{ userId: user._id }], { session });
 
     await session.commitTransaction();
     session.endSession();
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
     res.status(201).json({ 
       success: true, 
       token, 
@@ -124,23 +105,17 @@ app.post('/api/login', async (req, res) => {
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// ===================
-// USER + WALLET ROUTES
-// ===================
 app.get('/api/user', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     const wallet = await Wallet.findOne({ userId: req.user.id });
-    
     res.json({ 
       success: true, 
       user, 
       balances: wallet ? wallet.getAllBalances() : {},
       walletId: wallet ? wallet.walletId : null
     });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/wallet/fund', auth, async (req, res) => {
@@ -150,12 +125,11 @@ app.post('/api/wallet/fund', auth, async (req, res) => {
     
     const targetCurrency = currency || 'NGN';
     const wallet = await Wallet.findOne({ userId: req.user.id });
-    if (!wallet) return res.status(404).json({ success: false, message: 'Wallet records missing' });
+    if (!wallet) return res.status(404).json({ success: false, message: 'Wallet missing' });
 
-    // Atomic upgrade integration for currency mutations
     await Wallet.addBalance(wallet.walletId, targetCurrency, parseFloat(amount));
 
-    await Transaction.create({
+    await Txn.create({
       userId: req.user.id,
       walletId: wallet.walletId,
       type: 'credit',
@@ -165,9 +139,7 @@ app.post('/api/wallet/fund', auth, async (req, res) => {
     });
 
     res.json({ success: true, message: `Successfully funded wallet with ${amount} ${targetCurrency}` });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.post('/api/wallet/transfer', auth, async (req, res) => {
@@ -188,13 +160,10 @@ app.post('/api/wallet/transfer', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Cannot transfer funds to your own wallet' });
     }
 
-    // Atomic debit execution
     await Wallet.deductBalance(senderWallet.walletId, targetCurrency, parseFloat(amount));
-    // Atomic credit execution
     await Wallet.addBalance(recipientWallet.walletId, targetCurrency, parseFloat(amount));
 
-    // Log tracking for sender
-    await Transaction.create({
+    await Txn.create({
       userId: req.user.id,
       walletId: senderWallet.walletId,
       type: 'debit',
@@ -203,8 +172,7 @@ app.post('/api/wallet/transfer', auth, async (req, res) => {
       description: `Transfer to account: ${recipientWalletId}`
     });
 
-    // Log tracking for receiver
-    await Transaction.create({
+    await Txn.create({
       userId: recipientWallet.userId,
       walletId: recipientWallet.walletId,
       type: 'credit',
@@ -214,18 +182,14 @@ app.post('/api/wallet/transfer', auth, async (req, res) => {
     });
 
     res.json({ success: true, message: 'Multi-currency transfer processed successfully' });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 app.get('/api/transactions', auth, async (req, res) => {
   try {
-    const transactions = await Transaction.find({ userId: req.user.id }).sort({ createdAt: -1 });
+    const transactions = await Txn.find({ userId: req.user.id }).sort({ createdAt: -1 });
     res.json({ success: true, transactions });
-  } catch (e) {
-    res.status(500).json({ success: false, message: e.message });
-  }
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
 const PORT = process.env.PORT || 10000;
