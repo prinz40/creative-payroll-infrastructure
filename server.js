@@ -40,6 +40,7 @@ const auth = (req, res, next) => {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ success: false, message: 'Access Denied: No Token Provided' });
   }
+  // FIX: Added [1] to safely isolate the string payload token item
   const token = authHeader.split(' ')[1];
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -48,6 +49,7 @@ const auth = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Invalid or Expired Token' });
   }
 };
+
 
 app.post('/api/register', async (req, res) => {
   const session = await mongoose.startSession();
