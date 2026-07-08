@@ -35,10 +35,13 @@ mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('✅ MongoDB Database Connected Successfully'))
 .catch(err => console.error('❌ DB Connection Error: ', err));
 
+
 // Import Models
 const Wallet = require('./models/Wallet');
-const User = require('./models/User'); 
-const Transaction = require('./models/Transaction'); 
+const User = require('./User');
+const Transaction = require('./Transaction');
+
+
 
 // ===================
 // MIDDLEWARES
