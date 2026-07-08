@@ -1,7 +1,7 @@
 // ===================
-// CONFIG - RELATIVE PATH FOR RENDER
+// CONFIG - POINT TO BACKEND ON RENDER
 // ===================
-const API_URL = ''; // Empty means use same domain. This fixes CORS + localhost issues
+const API_URL = 'https://creative-payroll-infrastructure.onrender.com'; // ✅ FIXED: This is your backend URL
 const token = localStorage.getItem('token');
 
 // ===================
@@ -56,7 +56,7 @@ async function loadDashboard() {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
-    
+
     if(data.success){
       const user = data.user;
       // Show old app fields
@@ -64,7 +64,7 @@ async function loadDashboard() {
       document.getElementById('email').textContent = user.email;
       document.getElementById('walletId').textContent = user.walletId; // ✅ RESTORED
       document.getElementById('kycStatus').textContent = user.kycTier === 1 ? 'KYC TIER 1 VERIFIED' : 'UNVERIFIED';
-      
+
       // Show multi-currency balances
       document.getElementById('balanceNGN').textContent = `₦${user.balances.NGN.toFixed(2)}`;
       document.getElementById('balanceGHS').textContent = `GH₵${user.balances.GHS.toFixed(2)}`;
@@ -72,7 +72,7 @@ async function loadDashboard() {
       document.getElementById('balanceUSD').textContent = `$${user.balances.USD.toFixed(2)}`;
       document.getElementById('balanceEUR').textContent = `€${user.balances.EUR.toFixed(2)}`;
       document.getElementById('balanceGBP').textContent = `£${user.balances.GBP.toFixed(2)}`;
-      
+
       loadTransactions();
     }
   } catch(e){
@@ -145,7 +145,7 @@ async function fundWallet() {
   const amount = document.getElementById('fundAmount').value;
   const currency = document.getElementById('fundCurrency').value || 'NGN';
   const errorMsg = document.getElementById('fundError');
-  
+
   if(!amount || amount < 100) {
     errorMsg.textContent = 'Minimum funding is 100';
     return;
