@@ -14,11 +14,13 @@ body { background: #f5f5f5; }
 .input, .select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
 .card { background: white; padding: 15px; margin: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
 .hidden { display: none; }
-.balance { font-size: 28px; font-weight: bold; color: #667eea; }
+.balance { font-size: 22px; font-weight: bold; color: #667eea; }
 .currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .currency-card { background: #f0f4ff; padding: 10px; border-radius: 8px; text-align: center; }
 .txn { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
 .success { color: #2ed573; } .pending { color: #ffa502; }
+.kyc-badge { background: #2ed573; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
+.wallet-id { background: #eee; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -30,6 +32,7 @@ body { background: #f5f5f5; }
     <input type="email" id="email" class="input" placeholder="Email">
     <input type="password" id="password" class="input" placeholder="Password">
     <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
+    <p id="errorMsg" style="color:red; font-size:12px; margin-top:5px"></p>
     <button class="btn" id="authBtn" onclick="handleAuth()">Login</button>
     <p style="text-align:center; margin-top:10px;">
       <a href="#" onclick="switchToRegister()">Don't have an account? Register</a>
@@ -38,44 +41,62 @@ body { background: #f5f5f5; }
 
   <div id="bvnSection" class="card hidden">
     <h2>Verify BVN</h2>
-    <input type="text" id="bvn" class="input" placeholder="11 Digit BVN" maxlength="11">
-    <button class="btn" onclick="submitBVN()">Verify BVN</button>
+    <input type="text" id="bvnInput" class="input" placeholder="11 Digit BVN" maxlength="11">
+    <p id="bvnError" style="color:red; font-size:12px; display:none"></p>
+    <p id="bvnSuccess" style="color:green; font-size:12px; display:none"></p>
+    <button class="btn" id="verifyBvnBtn" onclick="verifyBVN()">Verify BVN</button>
   </div>
 
   <div id="dashboard" class="hidden">
     <div class="card">
-      <h3 id="userName">Welcome</h3>
-      <p id="userEmail" style="color:gray; font-size:14px"></p>
+      <h3 id="fullName">Welcome</h3>
+      <p id="email" style="color:gray; font-size:14px"></p>
+      <p style="margin-top:8px"><b>Wallet ID:</b> <span id="walletId" class="wallet-id"></span></p>
+      <p style="margin-top:8px"><b>KYC:</b> <span id="kycStatus" class="kyc-badge"></span></p>
     </div>
 
     <div class="card">
       <h3>Multi-Currency Wallet</h3>
-      <div class="currency-grid" id="balancesGrid"></div>
+      <div class="currency-grid">
+        <div class="currency-card"><small>NGN</small><div id="balanceNGN" class="balance">0.00</div></div>
+        <div class="currency-card"><small>GHS</small><div id="balanceGHS" class="balance">0.00</div></div>
+        <div class="currency-card"><small>KES</small><div id="balanceKES" class="balance">0.00</div></div>
+        <div class="currency-card"><small>USD</small><div id="balanceUSD" class="balance">0.00</div></div>
+        <div class="currency-card"><small>EUR</small><div id="balanceEUR" class="balance">0.00</div></div>
+        <div class="currency-card"><small>GBP</small><div id="balanceGBP" class="balance">0.00</div></div>
+      </div>
     </div>
 
     <div class="card">
       <h3>Fund Wallet</h3>
-      <input type="number" id="fundAmount" class="input" placeholder="Amount">
+      <input type="number" id="fundAmount" class="input" placeholder="Amount Min 100">
       <select id="fundCurrency" class="select">
         <option value="NGN">NGN - Nigerian Naira</option>
+        <option value="GHS">GHS - Ghana Cedi</option>
+        <option value="KES">KES - Kenyan Shilling</option>
         <option value="USD">USD - US Dollar</option>
         <option value="EUR">EUR - Euro</option>
         <option value="GBP">GBP - British Pound</option>
       </select>
+      <p id="fundError" style="color:red; font-size:12px"></p>
       <button class="btn" onclick="fundWallet()">Fund with Paystack</button>
     </div>
 
     <div class="card">
       <h3>Send Money</h3>
-      <input type="email" id="transferEmail" class="input" placeholder="Recipient Email">
-      <input type="number" id="transferAmount" class="input" placeholder="Amount">
-      <select id="transferCurrency" class="select">
+      <input type="text" id="recipient" class="input" placeholder="Recipient Email OR Wallet ID">
+      <input type="number" id="sendAmount" class="input" placeholder="Amount">
+      <select id="sendCurrency" class="select">
         <option value="NGN">NGN</option>
+        <option value="GHS">GHS</option>
+        <option value="KES">KES</option>
         <option value="USD">USD</option>
         <option value="EUR">EUR</option>
         <option value="GBP">GBP</option>
       </select>
-      <button class="btn" onclick="transferMoney()">Send</button>
+      <input type="text" id="narration" class="input" placeholder="Narration - Optional">
+      <p id="sendError" style="color:red; font-size:12px"></p>
+      <button class="btn" onclick="sendMoney()">Send</button>
     </div>
 
     <div class="card">
@@ -93,164 +114,13 @@ body { background: #f5f5f5; }
 
     <div class="card">
       <h3>Transaction History</h3>
-      <div id="txnList">Loading...</div>
+      <div id="transactionList">Loading...</div>
     </div>
 
     <button class="btn" style="background:#ff4757" onclick="handleLogout()">Logout</button>
   </div>
 </div>
 
-<script>
-const API_URL = '/api';
-let currentUser = null;
-
-function getToken() { return localStorage.getItem('token'); }
-function setToken(token) { localStorage.setItem('token', token); }
-function clearToken() { localStorage.removeItem('token'); }
-
-async function apiCall(endpoint, method = 'GET', data = null) {
-  const headers = { 'Content-Type': 'application/json' };
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(API_URL + endpoint, { method, headers, body: data ? JSON.stringify(data) : null });
-  return res.json();
-}
-
-async function handleAuth() {
-  const btn = document.getElementById('authBtn');
-  btn.disabled = true; btn.textContent = 'Please wait...';
-  try {
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const isRegister = document.getElementById('fullName').classList.contains('hidden') === false;
-    const endpoint = isRegister ? '/register' : '/login';
-    const data = isRegister ? { email, password, fullName: document.getElementById('fullName').value } : { email, password };
-    
-    const result = await apiCall(endpoint, 'POST', data);
-    alert(result.message); // WELCOME NOTE FROM SERVER
-    if (result.success) {
-      setToken(result.token);
-      currentUser = result.user;
-      if (result.user.kycTier === 0) showBVN();
-      else showDashboard(result.user);
-    }
-  } catch(e) { alert('Error: ' + e.message); }
-  finally { btn.disabled = false; btn.textContent = isRegister ? 'Register' : 'Login'; }
-}
-
-async function submitBVN() {
-  const bvn = document.getElementById('bvn').value;
-  const result = await apiCall('/bvn', 'POST', { bvn });
-  alert(result.message);
-  if (result.success) showDashboard(result.user);
-}
-
-async function fundWallet() {
-  const amount = document.getElementById('fundAmount').value;
-  const currency = document.getElementById('fundCurrency').value;
-  const result = await apiCall('/wallet/fund', 'POST', { amount, currency });
-  if (result.success) window.location.href = result.authorization_url;
-  else alert(result.message);
-}
-
-async function transferMoney() {
-  const email = document.getElementById('transferEmail').value;
-  const amount = document.getElementById('transferAmount').value;
-  const currency = document.getElementById('transferCurrency').value;
-  const result = await apiCall('/wallet/transfer', 'POST', { email, amount, currency });
-  alert(result.message);
-  if (result.success) { refreshUser(); loadTransactions(); }
-}
-
-async function buyAirtime() {
-  const number = document.getElementById('airtimeNumber').value;
-  const amount = document.getElementById('airtimeAmount').value;
-  const network = document.getElementById('airtimeNetwork').value;
-  const result = await apiCall('/wallet/airtime', 'POST', { number, amount, network });
-  alert(result.message);
-  if (result.success) { refreshUser(); loadTransactions(); }
-}
-
-async function refreshUser() {
-  const data = await apiCall('/user');
-  if (data.success) showDashboard(data.user);
-}
-
-async function loadTransactions() {
-  const data = await apiCall('/transactions');
-  if (data.success) {
-    const list = document.getElementById('txnList');
-    if (data.transactions.length === 0) { list.innerHTML = 'No transactions yet'; return; }
-    list.innerHTML = data.transactions.map(t => `
-      <div class="txn">
-        <div>
-          <b>${t.type.replace('_', ' ').toUpperCase()}</b><br>
-          <small>${new Date(t.createdAt).toLocaleDateString()}</small>
-        </div>
-        <div class="${t.status}">
-          ${t.status === 'success' ? '+' : ''}${t.amount} ${t.currency}
-        </div>
-      </div>
-    `).join('');
-  }
-}
-
-function switchToRegister() {
-  document.getElementById('authTitle').textContent = 'Register';
-  document.getElementById('authBtn').textContent = 'Register';
-  document.getElementById('fullName').classList.remove('hidden');
-  document.querySelector('#authSection a').onclick = switchToLogin;
-  document.querySelector('#authSection a').textContent = 'Already have an account? Login';
-}
-
-function switchToLogin() {
-  document.getElementById('authTitle').textContent = 'Login';
-  document.getElementById('authBtn').textContent = 'Login';
-  document.getElementById('fullName').classList.add('hidden');
-  document.querySelector('#authSection a').onclick = switchToRegister;
-  document.querySelector('#authSection a').textContent = 'Don\'t have an account? Register';
-}
-
-function showBVN() {
-  document.getElementById('authSection').classList.add('hidden');
-  document.getElementById('bvnSection').classList.remove('hidden');
-}
-
-function showDashboard(user) {
-  currentUser = user;
-  document.getElementById('authSection').classList.add('hidden');
-  document.getElementById('bvnSection').classList.add('hidden');
-  document.getElementById('dashboard').classList.remove('hidden');
-  document.getElementById('userName').textContent = `Welcome, ${user.fullName}`;
-  document.getElementById('userEmail').textContent = user.email;
-  
-  // MULTI CURRENCY BALANCES
-  const grid = document.getElementById('balancesGrid');
-  grid.innerHTML = Object.keys(user.balances).map(cur => `
-    <div class="currency-card">
-      <small>${cur}</small>
-      <div class="balance">${user.balances[cur].toLocaleString()}</div>
-    </div>
-  `).join('');
-  
-  loadTransactions();
-}
-
-function handleLogout() {
-  clearToken();
-  location.reload();
-}
-
-window.addEventListener('DOMContentLoaded', async () => {
-  const token = getToken();
-  if (token) {
-    try {
-      const data = await apiCall('/user');
-      if (data.success) showDashboard(data.user);
-      else { clearToken(); switchToLogin(); }
-    } catch { clearToken(); switchToLogin(); }
-  }
-});
-</script>
+<script src="app.js"></script>
 </body>
 </html>
