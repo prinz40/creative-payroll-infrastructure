@@ -18,8 +18,9 @@ body { background: #f5f5f5; }
 .currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .currency-card { background: #f0f4ff; padding: 10px; border-radius: 8px; text-align: center; }
 .txn { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-.success { color: #2ed573; } .pending { color: #ffa502; }
+.success { color: #2ed573; } .pending { color: #ffa502; } .failed { color: #ff4757; }
 .kyc-badge { background: #2ed573; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
+.kyc-pending { background: #ffa502; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
 .wallet-id { background: #eee; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 12px; }
 </style>
 </head>
@@ -27,32 +28,35 @@ body { background: #f5f5f5; }
 <div class="container">
   <div class="header"><h1>CreativePay</h1><p style="font-size:12px">Beat Payoneer + Wise 💪</p></div>
 
+  <!-- AUTH SECTION -->
   <div id="authSection" class="card">
     <h2 id="authTitle">Login</h2>
-    <input type="email" id="email" class="input" placeholder="Email">
-    <input type="password" id="password" class="input" placeholder="Password">
-    <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
+    <input type="text" id="fullNameInput" class="input hidden" placeholder="Full Name">
+    <input type="email" id="emailInput" class="input" placeholder="Email">
+    <input type="password" id="passwordInput" class="input" placeholder="Password">
     <p id="errorMsg" style="color:red; font-size:12px; margin-top:5px"></p>
     <button class="btn" id="authBtn" onclick="handleAuth()">Login</button>
     <p style="text-align:center; margin-top:10px;">
-      <a href="#" onclick="switchToRegister()">Don't have an account? Register</a>
+      <a href="#" id="toggleAuthLink" onclick="switchToRegister()">Don't have an account? Register</a>
     </p>
   </div>
 
+  <!-- BVN VERIFICATION SECTION -->
   <div id="bvnSection" class="card hidden">
     <h2>Verify BVN</h2>
     <input type="text" id="bvnInput" class="input" placeholder="11 Digit BVN" maxlength="11">
-    <p id="bvnError" style="color:red; font-size:12px; display:none"></p>
-    <p id="bvnSuccess" style="color:green; font-size:12px; display:none"></p>
+    <p id="bvnError" style="color:red; font-size:12px; margin-top:5px; display:none"></p>
+    <p id="bvnSuccess" style="color:green; font-size:12px; margin-top:5px; display:none"></p>
     <button class="btn" id="verifyBvnBtn" onclick="verifyBVN()">Verify BVN</button>
   </div>
 
+  <!-- MAIN DASHBOARD -->
   <div id="dashboard" class="hidden">
     <div class="card">
-      <h3 id="fullName">Welcome</h3>
-      <p id="email" style="color:gray; font-size:14px"></p>
+      <h3>Welcome, <span id="userDispName">User</span></h3>
+      <p style="color:gray; font-size:14px" id="userDispEmail"></p>
       <p style="margin-top:8px"><b>Wallet ID:</b> <span id="walletId" class="wallet-id"></span></p>
-      <p style="margin-top:8px"><b>KYC:</b> <span id="kycStatus" class="kyc-badge"></span></p>
+      <p style="margin-top:8px"><b>KYC Status:</b> <span id="kycStatus" class="kyc-badge">Verified</span></p>
     </div>
 
     <div class="card">
@@ -78,8 +82,8 @@ body { background: #f5f5f5; }
         <option value="EUR">EUR - Euro</option>
         <option value="GBP">GBP - British Pound</option>
       </select>
-      <p id="fundError" style="color:red; font-size:12px"></p>
-      <button class="btn" onclick="fundWallet()">Fund with Paystack</button>
+      <p id="fundError" style="color:red; font-size:12px; margin-top:5px"></p>
+      <button class="btn" onclick="fundWallet()">Fund Wallet</button>
     </div>
 
     <div class="card">
@@ -95,7 +99,7 @@ body { background: #f5f5f5; }
         <option value="GBP">GBP</option>
       </select>
       <input type="text" id="narration" class="input" placeholder="Narration - Optional">
-      <p id="sendError" style="color:red; font-size:12px"></p>
+      <p id="sendError" style="color:red; font-size:12px; margin-top:5px"></p>
       <button class="btn" onclick="sendMoney()">Send</button>
     </div>
 
@@ -109,18 +113,117 @@ body { background: #f5f5f5; }
         <option value="GLO">GLO</option>
         <option value="9MOBILE">9MOBILE</option>
       </select>
+      <p id="airtimeError" style="color:red; font-size:12px; margin-top:5px"></p>
       <button class="btn" onclick="buyAirtime()">Buy Airtime</button>
     </div>
 
     <div class="card">
       <h3>Transaction History</h3>
-      <div id="transactionList">Loading...</div>
+      <div id="transactionList">No recent transactions.</div>
     </div>
 
     <button class="btn" style="background:#ff4757" onclick="handleLogout()">Logout</button>
   </div>
 </div>
 
-<script src="app.js"></script>
-</body>
-</html>
+<script>
+// REPLACE WITH YOUR ACTUAL LIVE RENDER ENDPOINT SYSTEM URL
+const API_BASE_URL = "https://onrender.com";
+
+let isLoginMode = true;
+let authToken = localStorage.getItem("token") || null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    if (authToken) {
+        fetchDashboardData();
+    }
+});
+
+function switchToRegister() {
+    isLoginMode = false;
+    document.getElementById("authTitle").innerText = "Register";
+    document.getElementById("fullNameInput").classList.remove("hidden");
+    document.getElementById("authBtn").innerText = "Register";
+    document.getElementById("toggleAuthLink").outerHTML = '<a href="#" id="toggleAuthLink" onclick="switchToLogin()">Already have an account? Login</a>';
+}
+
+function switchToLogin() {
+    isLoginMode = true;
+    document.getElementById("authTitle").innerText = "Login";
+    document.getElementById("fullNameInput").classList.add("hidden");
+    document.getElementById("authBtn").innerText = "Login";
+    document.getElementById("toggleAuthLink").outerHTML = '<a href="#" id="toggleAuthLink" onclick="switchToRegister()">Don\'t have an account? Register</a>';
+}
+
+async function handleAuth() {
+    const email = document.getElementById("emailInput").value.trim();
+    const password = document.getElementById("passwordInput").value;
+    const fullName = document.getElementById("fullNameInput").value.trim();
+    const errorMsg = document.getElementById("errorMsg");
+    
+    errorMsg.innerText = "";
+    if(!email || !password || (!isLoginMode && !fullName)) {
+        errorMsg.innerText = "Please fill all required inputs.";
+        return;
+    }
+
+    const endpoint = isLoginMode ? "/auth/login" : "/auth/register";
+    const payload = isLoginMode ? { email, password } : { name: fullName, email, password };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.message || "Authentication failed.");
+
+        authToken = data.token;
+        localStorage.setItem("token", authToken);
+        
+        if (!isLoginMode || data.user.kycStatus === "Unverified") {
+            showBvnVerification();
+        } else {
+            fetchDashboardData();
+        }
+    } catch (err) {
+        errorMsg.innerText = err.message;
+    }
+}
+
+function showBvnVerification() {
+    document.getElementById("authSection").classList.add("hidden");
+    document.getElementById("bvnSection").classList.remove("hidden");
+    document.getElementById("dashboard").classList.add("hidden");
+}
+
+async function verifyBVN() {
+    const bvn = document.getElementById("bvnInput").value.trim();
+    const bvnError = document.getElementById("bvnError");
+    const bvnSuccess = document.getElementById("bvnSuccess");
+
+    bvnError.style.display = "none";
+    bvnSuccess.style.display = "none";
+
+    if (bvn.length !== 11 || isNaN(bvn)) {
+        bvnError.innerText = "BVN must be exactly 11 numeric digits.";
+        bvnError.style.display = "block";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/kyc/verify-bvn`, {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",        },
+        body: JSON.stringify({ bvn })
+    });
+    
+    const data = await response.json();
+    // Add your success handling logic here (e.g., bvnSuccess.style.display = "block")
+
+} catch (error) {
+    console.error(error);
+}
