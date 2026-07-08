@@ -10,24 +10,24 @@ const walletSchema = new mongoose.Schema({
   },
   walletId: { 
     type: String, 
-    unique: true, 
+    unique: true,  // ✅ This already creates an index. Do NOT add index() again
     required: true,
-    default: () => `CPY-${Date.now()}-${Math.random().toString(36).substr(2,4).toUpperCase()}`
+    default: () => `CPY-${uuidv4().split('-')[0].toUpperCase()}` // ✅ Cleaner ID
   },
-  // ✅ PROFESSIONAL: Multi-currency support. Matches your old app + new currencies
+  // ✅ PROFESSIONAL: Multi-currency support
   balances: {
     type: Map,
     of: Number,
-    default: { 
+    default: () => ({  // ✅ FIXED: Map default must be a function
       'NGN': 0, 
       'GHS': 0, 
       'KES': 0,
       'USD': 0,
       'EUR': 0,
       'GBP': 0
-    }
+    })
   },
-  defaultCurrency: { // renamed from currency to avoid confusion
+  defaultCurrency: {
     type: String,
     default: 'NGN',
     enum: ['NGN', 'GHS', 'KES', 'USD', 'EUR', 'GBP']
@@ -71,8 +71,8 @@ walletSchema.methods.getAllBalances = function() {
   return Object.fromEntries(this.balances);
 };
 
-// Index for faster lookups
-walletSchema.index({ walletId: 1 });
-walletSchema.index({ userId: 1 });
+// ✅ REMOVED DUPLICATE INDEX. unique: true already does this
+// walletSchema.index({ walletId: 1 }); 
+walletSchema.index({ userId: 1 }); // This one is fine
 
 module.exports = mongoose.model('Wallet', walletSchema);
