@@ -14,6 +14,7 @@ const walletSchema = new mongoose.Schema({
     required: true,
     default: () => `CPY-${uuidv4().split('-')[0].toUpperCase()}`
   },
+  // We keep the Map structure, but enforce values to preserve scaling rules
   balances: {
     type: Map,
     of: Number,
@@ -44,33 +45,63 @@ const walletSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 
-// HELPER: Get balance for any currency. Safe fallback to 0
+// HELPER: Safely retrieve any balance with standard decimal fallbacks
 walletSchema.methods.getBalance = function(currency = 'NGN') {
-  return this.balances.get(currency) || 0;
+  const amount = this.balances.get(currency);
+  return amount !== undefined ? parseFloat(amount.toFixed(2)) : 0;
 };
 
-// HELPER: Add money to a currency - with validation
-walletSchema.methods.addBalance = async function(currency, amount) {
-  if(amount <= 0) throw new Error('Amount must be greater than 0');
-  const current = this.getBalance(currency);
-  this.balances.set(currency, parseFloat((current + amount).toFixed(2)));
-  return await this.save();
+// ATOMIC UPDATE: Safe addition using MongoDB atomic increments to avoid race conditions
+walletSchema.statics.addBalance = async function(walletId, currency, amount) {
+  if (amount <= 0) throw new Error('Amount must be greater than 0');
+  
+  // Format to standard 2-decimal maximum limit securely
+  const cleanAmount = parseFloat(amount.toFixed(2));
+
+  const updatedWallet = await this.findOneAndUpdate(
+    { walletId: walletId, status: 'active' },
+    { $inc: { [`balances.${currency}`]: cleanAmount } },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedWallet) throw new Error('Wallet not found or is currently frozen/closed');
+  return updatedWallet;
 };
 
-// HELPER: Deduct money from a currency - with validation
-walletSchema.methods.deductBalance = async function(currency, amount) {
-  const current = this.getBalance(currency);
-  if(current < amount) throw new Error(`Insufficient ${currency} balance`);
-  this.balances.set(currency, parseFloat((current - amount).toFixed(2)));
-  return await this.save();
+// ATOMIC UPDATE: Safe subtraction checking balances atomically to prevent negative overdrafts
+walletSchema.statics.deductBalance = async function(walletId, currency, amount) {
+  if (amount <= 0) throw new Error('Amount must be greater than 0');
+  
+  const cleanAmount = parseFloat(amount.toFixed(2));
+
+  // The critical check: balances must be greater than or equal to the deduction cleanAmount
+  const updatedWallet = await this.findOneAndUpdate(
+    { 
+      walletId: walletId, 
+      status: 'active',
+      [`balances.${currency}`]: { $gte: cleanAmount } 
+    },
+    { $inc: { [`balances.${currency}`]: -cleanAmount } },
+    { new: true, runValidators: true }
+  );
+
+  if (!updatedWallet) {
+    throw new Error(`Transaction failed: Insufficient ${currency} balance or wallet unavailable`);
+  }
+  return updatedWallet;
 };
 
-// HELPER: Get all balances as object for frontend
+// HELPER: Convert Map explicitly to clean JSON object for API consumption
 walletSchema.methods.getAllBalances = function() {
-  return Object.fromEntries(this.balances);
+  const balanceObj = Object.fromEntries(this.balances);
+  for (const [key, value] of Object.entries(balanceObj)) {
+    balanceObj[key] = parseFloat(value.toFixed(2));
+  }
+  return balanceObj;
 };
 
-// ✅ ONLY KEEP THIS INDEX
+// Compound indexing configurations for rapid transactional lookups
 walletSchema.index({ userId: 1 });
+walletSchema.index({ walletId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Wallet', walletSchema);
