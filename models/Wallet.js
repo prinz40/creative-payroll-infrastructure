@@ -10,15 +10,14 @@ const walletSchema = new mongoose.Schema({
   },
   walletId: { 
     type: String, 
-    unique: true,  // ✅ This already creates an index. Do NOT add index() again
+    unique: true,
     required: true,
-    default: () => `CPY-${uuidv4().split('-')[0].toUpperCase()}` // ✅ Cleaner ID
+    default: () => `CPY-${uuidv4().split('-')[0].toUpperCase()}`
   },
-  // ✅ PROFESSIONAL: Multi-currency support
   balances: {
     type: Map,
     of: Number,
-    default: () => ({  // ✅ FIXED: Map default must be a function
+    default: () => ({
       'NGN': 0, 
       'GHS': 0, 
       'KES': 0,
@@ -71,8 +70,7 @@ walletSchema.methods.getAllBalances = function() {
   return Object.fromEntries(this.balances);
 };
 
-// ✅ REMOVED DUPLICATE INDEX. unique: true already does this
-// walletSchema.index({ walletId: 1 }); 
-walletSchema.index({ userId: 1 }); // This one is fine
+// ✅ ONLY KEEP THIS INDEX
+walletSchema.index({ userId: 1 });
 
 module.exports = mongoose.model('Wallet', walletSchema);
