@@ -7,6 +7,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid'); // ✅ ADDED
 
 const app = express();
 
@@ -24,30 +25,30 @@ mongoose.connect(process.env.MONGODB_URI)
 .then(() => console.log('✅ DB Connected'))
 .catch(err => console.error(err));
 
-// Import Wallet Model - now we use separate Wallet collection
+// Import Wallet Model
 const Wallet = require('./models/Wallet');
 
-// USER SCHEMA - simplified. Balances now live in Wallet
+// USER SCHEMA
 const userSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   fullName: String,
   bvn: String,
-  kycTier: { type: Number, default: 1 }, // Default to 1 like old app
-  riskScore: { type: Number, default: 0 }, // ANTI-FRAUD
+  kycTier: { type: Number, default: 1 },
+  riskScore: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 const User = mongoose.model('User', userSchema);
 
-// TRANSACTION HISTORY + DOUBLE PAYMENT PROTECTION
+// TRANSACTION SCHEMA
 const transactionSchema = new mongoose.Schema({
   userId: mongoose.Schema.Types.ObjectId,
-  walletId: String, // Added for tracking
-  type: String, // fund, transfer_out, transfer_in, airtime
+  walletId: String,
+  type: String,
   amount: Number,
   currency: { type: String, default: 'NGN' },
-  status: String, // pending, success, failed
-  reference: { type: String, unique: true }, // ANTI-DUPLICATE
+  status: String,
+  reference: { type: String, unique: true },
   metadata: Object,
   createdAt: { type: Date, default: Date.now }
 });
@@ -80,23 +81,28 @@ const checkFraud = (user, amount) => {
 const getWallet = async (userId) => {
   let wallet = await Wallet.findOne({ userId });
   if(!wallet){
-    wallet = await Wallet.create({ userId }); // auto-generates walletId
+    wallet = await Wallet.create({ userId });
   }
   return wallet;
 };
 
-// AUTH ROUTES WITH WELCOME NOTE
+// ✅ HEALTH CHECK - FOR RENDER + README
+app.get('/api/health', (req, res) => {
+  res.json({ status: "OPERATIONAL" });
+});
+
+// AUTH ROUTES
 app.post('/api/register', async (req, res) => {
   try {
-    const { email, password, fullName } = req.body;
+    const { email, password, fullName, bvn } = req.body; // ✅ ADDED BVN
     if (!email ||!password ||!fullName) return res.json({ success: false, message: 'All fields required' });
 
     const exists = await User.findOne({ email });
     if (exists) return res.json({ success: false, message: 'Email already exists' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashed, fullName });
-    await getWallet(user._id); // Create wallet on signup
+    const user = await User.create({ email, password: hashed, fullName, bvn }); // ✅ SAVE BVN
+    await getWallet(user._id);
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET);
     const wallet = await getWallet(user._id);
@@ -133,8 +139,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-//... BVN, /api/user, /api/transactions routes remain same...
-
 app.get('/api/user', authMiddleware, async (req, res) => {
   const wallet = await getWallet(req.user._id);
   res.json({ success: true, user: {...req.user.toObject(), walletId: wallet.walletId, balances: wallet.getAllBalances()} });
@@ -154,23 +158,23 @@ app.post('/api/wallet/fund', authMiddleware, async (req, res) => {
     const response = await axios.post('https://api.paystack.co/transaction/initialize', {
       email: req.user.email,
       amount: amount * 100,
-      currency: 'NGN', // Paystack only accepts NGN. We convert later
+      currency: 'NGN',
       reference,
-      metadata: { userId: req.user._id, currency }, // ✅ CRITICAL: Save target currency
+      metadata: { userId: req.user._id, currency },
       callback_url: `${req.headers.origin}/payment-callback`
     }, {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
     });
 
     await Transaction.create({ userId: req.user._id, type: 'fund', amount, currency, status: 'pending', reference });
-    res.json({ success: true, authorization_url: response.data.authorization_url });
+    res.json({ success: true, authorization_url: response.data.data.authorization_url }); // ✅ FIXED:.data.data
   } catch (e) {
-    console.error(e);
+    console.error(e.response?.data || e.message);
     res.json({ success: false, message: 'Payment init failed' });
   }
 });
 
-// ✅ CRITICAL FIX 2: PAYMENT CALLBACK - VERIFY AND CREDIT WALLET
+// PAYMENT CALLBACK
 app.get('/payment-callback', async (req, res) => {
   const { reference } = req.query;
   try {
@@ -178,23 +182,21 @@ app.get('/payment-callback', async (req, res) => {
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
     });
 
-    if (response.data.status === 'success') {
-      const data = response.data;
+    if (response.data.status === 'success' && response.data.data.status === 'success') { // ✅ FIXED
+      const data = response.data.data;
       const amount = data.amount / 100;
       const email = data.customer.email;
-      const currency = data.metadata.currency || 'NGN'; // Get target currency
+      const currency = data.metadata.currency || 'NGN';
 
       const user = await User.findOne({ email });
       const txn = await Transaction.findOne({ reference });
       const wallet = await getWallet(user._id);
 
-      if (user && txn && txn.status === 'pending') { // DOUBLE PAYMENT CHECK
-        await wallet.addBalance(currency, amount); // ✅ CREDIT THE WALLET, NOT USER
+      if (user && txn && txn.status === 'pending') {
+        await wallet.addBalance(currency, amount);
         txn.status = 'success';
         txn.walletId = wallet.walletId;
         await txn.save();
-
-        // ✅ CRITICAL FIX 3: REDIRECT WITH SUCCESS MESSAGE
         return res.redirect(`/?success=true&amount=${amount}&currency=${currency}`);
       }
     }
@@ -205,17 +207,17 @@ app.get('/payment-callback', async (req, res) => {
   }
 });
 
-// TRANSFER - now uses walletId OR email
+// TRANSFER
 app.post('/api/wallet/transfer', authMiddleware, async (req, res) => {
   try {
-    const { recipient, amount, currency = 'NGN', narration = '' } = req.body; // recipient can be email or walletId
+    const { recipient, amount, currency = 'NGN', narration = '' } = req.body;
     if (!recipient ||!amount) return res.json({ success: false, message: 'All fields required' });
 
     const fraud = checkFraud(req.user, amount);
     if (fraud.blocked) return res.json({ success: false, message: fraud.reason });
 
     const senderWallet = await getWallet(req.user._id);
-    const recipientUser = await User.findOne({ $or: [{ email: recipient }, { _id: recipient }] });
+    const recipientUser = await User.findOne({ $or: [{ email: recipient }] }); // ✅ FIXED
     if (!recipientUser) return res.json({ success: false, message: 'Recipient not found' });
     const recipientWallet = await getWallet(recipientUser._id);
 
@@ -233,8 +235,6 @@ app.post('/api/wallet/transfer', authMiddleware, async (req, res) => {
     res.json({ success: false, message: e.message });
   }
 });
-
-//... airtime route remains same but uses wallet...
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ CreativePay Running on port ${PORT}`));
