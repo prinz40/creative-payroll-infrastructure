@@ -13,7 +13,7 @@ const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ['credit', 'debit']
+    enum: ['credit', 'debit', 'transfer', 'funding', 'withdrawal'] // added more types for payroll
   },
   amount: {
     type: Number,
@@ -25,25 +25,20 @@ const transactionSchema = new mongoose.Schema({
     enum: ['NGN', 'GHS', 'KES', 'USD', 'EUR', 'GBP'],
     default: 'NGN'
   },
-  description: {
+  description: { // added this so we know what the transaction was for
     type: String,
-    required: true,
-    trim: true
+    default: ''
   },
-  reference: {
+  reference: { // added this for Paystack reference
     type: String,
     unique: true,
-    default: () => `TXN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    sparse: true
   },
-  status: {
+  status: { // added this
     type: String,
-    required: true,
     enum: ['pending', 'success', 'failed'],
-    default: 'success'
+    default: 'pending'
   }
-}, { timestamps: true });
-
-// Index for super fast transaction history fetching per user
-transactionSchema.index({ userId: 1, createdAt: -1 });
+}, { timestamps: true }); // this adds createdAt and updatedAt automatically
 
 module.exports = mongoose.model('Transaction', transactionSchema);
