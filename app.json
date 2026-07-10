@@ -1,0 +1,9 @@
+{
+  "name": "creative-payroll-backend",
+  "buildCommand": "npm install",
+  "startCommand": "node server.js",
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "10000"
+  }
+}
