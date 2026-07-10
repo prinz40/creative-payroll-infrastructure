@@ -50,37 +50,35 @@ const auth = (req, res, next) => {
   }
 };
 
-
 app.post('/api/register', async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
-    const { email, password, name } = req.body;
-    if (!email || !password || !name) {
+    const { email, password, fullName } = req.body; // FIXED: was 'name'
+    if (!email || !password || !fullName) {
       return res.status(400).json({ success: false, message: 'All fields are required' });
     }
 
-    const existing = await User.findOne({ email }).session(session);
+    const existing = await User.findOne({ email });
     if (existing) {
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
     const hashed = await bcrypt.hash(password, 10);
-    const [user] = await User.create([{ name, email, password: hashed }], { session });
-    await Wallet.create([{ userId: user._id }], { session });
-
-    await session.commitTransaction();
-    session.endSession();
+    const walletId = 'CP' + crypto.randomBytes(4).toString('hex').toUpperCase(); // generate walletId
+    
+    const user = await User.create({ 
+      name: fullName, // map fullName to name
+      email, 
+      password: hashed,
+      walletId: walletId // save walletId in User
+    });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.status(201).json({ 
       success: true, 
       token, 
-      user: { id: user._id, name: user.name, email: user.email } 
+      user: { id: user._id, name: user.name, email: user.email, walletId: user.walletId, balances: user.balances, kycTier: user.kycTier } 
     });
   } catch(e) { 
-    await session.abortTransaction();
-    session.endSession();
     res.status(500).json({ success: false, message: e.message }); 
   }
 });
@@ -88,10 +86,6 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
-    }
-
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ success: false, message: 'Invalid credentials' });
 
@@ -102,7 +96,7 @@ app.post('/api/login', async (req, res) => {
     res.json({ 
       success: true, 
       token, 
-      user: { id: user._id, name: user.name, email: user.email, role: user.role } 
+      user: { id: user._id, name: user.name, email: user.email, role: user.role, walletId: user.walletId, balances: user.balances, kycTier: user.kycTier } 
     });
   } catch(e) { res.status(500).json({ success: false, message: e.message }); }
 });
