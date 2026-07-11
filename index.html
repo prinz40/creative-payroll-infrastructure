@@ -29,20 +29,22 @@ body { background: #f5f5f5; }
 <body>
 <div class="container">
   <div class="header"><h1>CreativePay</h1><p style="font-size:12px">Beat Payoneer + Wise 💪</p></div>
+  
+<!-- AUTH SECTION -->
+<div id="authSection" class="card">
+  <h2 id="authTitle">Login</h2>
+  <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
+  <input type="email" id="email" class="input" placeholder="Email">
+  <input type="password" id="password" class="input" placeholder="Password">
+  <p id="errorMsg" style="color:red; font-size:12px; margin-top:5px"></p>
+  
+  <button class="btn" id="loginBtn">Login</button>
+  <button class="btn hidden" id="registerBtn">Register</button>
 
-  <!-- AUTH SECTION -->
-  <div id="authSection" class="card">
-    <h2 id="authTitle">Login</h2>
-    <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
-    <input type="email" id="email" class="input" placeholder="Email">
-    <input type="password" id="password" class="input" placeholder="Password">
-    <p id="errorMsg" style="color:red; font-size:12px; margin-top:5px"></p>
-    <button class="btn" id="loginBtn">Login</button>
-    <button class="btn hidden" id="registerBtn">Register</button>
-    <p style="text-align:center; margin-top:10px;">
-      <a href="#" id="toggleAuthLink">Don't have an account? Register</a>
-    </p>
-  </div>
+  <p style="text-align:center; margin-top:10px;">
+    <a href="#" id="toggleAuthLink">Don't have an account? Register</a>
+  </p>
+</div>
 
   <!-- BVN VERIFICATION SECTION -->
   <div id="bvnSection" class="card hidden">
@@ -56,8 +58,8 @@ body { background: #f5f5f5; }
   <!-- MAIN DASHBOARD -->
   <div id="dashboard" class="hidden">
     <div class="card">
-      <h3>Welcome, <span id="fullName">User</span></h3>
-      <p style="color:gray; font-size:14px" id="email"></p>
+      <h3>Welcome, <span id="userDispName">User</span></h3>
+      <p style="color:gray; font-size:14px" id="userDispEmail"></p>
       <p style="margin-top:8px"><b>Wallet ID:</b> <span id="walletId" class="wallet-id"></span></p>
       <p style="margin-top:8px"><b>KYC Status:</b> <span id="kycStatus" class="kyc-badge">Verified</span></p>
     </div>
@@ -114,7 +116,7 @@ body { background: #f5f5f5; }
     <button class="btn" style="background:#ff4757" id="logoutBtn">Logout</button>
   </div>
 </div>
+<script src="app.js?v=2"></script>
 
-<script src="app.js"></script>
 </body>
         </html>
