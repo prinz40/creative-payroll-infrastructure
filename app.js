@@ -1,8 +1,19 @@
 // ===================
-// CONFIG - POINT TO BACKEND ON RENDER
+// CONFIG - BACKEND ON RENDER
 // ===================
-const API_URL = 'https://creative-payroll-infrastructure.onrender.com'; // ✅ FIXED: This is your backend URL
+const API_URL = 'https://creative-payroll-infrastructure.onrender.com'; 
 const token = localStorage.getItem('token');
+
+// ===================
+// HELPER: SHOW TOAST ALERTS INSTEAD OF ALERT()
+// ===================
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
 
 // ===================
 // HELPER: FETCH WITH TIMEOUT + RETRY FOR RENDER COLD START
@@ -10,45 +21,84 @@ const token = localStorage.getItem('token');
 async function fetchWithRetry(url, options, retries = 2, delay = 3000) {
   for (let i = 0; i <= retries; i++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); 
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(timeoutId);
+      
+      // Auto logout if token expired
+      if(res.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+        return;
+      }
       return res;
     } catch (err) {
       clearTimeout(timeoutId);
-      if (i === retries || err.name !== 'AbortError') throw err;
+      if (i === retries) {
+        showToast('Network error. Server might be waking up. Please try again.', 'error');
+        throw err;
+      }
       await new Promise(r => setTimeout(r, delay));
     }
   }
 }
 
 // ===================
-// ON PAGE LOAD: CHECK SUCCESS ALERT + LOAD DASHBOARD
+// ON PAGE LOAD
 // ===================
 document.addEventListener('DOMContentLoaded', () => {
-  // 1. Check for success alert from Paystack
+  // 1. Payment success/fail alert
   const params = new URLSearchParams(window.location.search);
   if(params.get('success') === 'true'){
     const amount = params.get('amount');
     const currency = params.get('currency');
-    alert(`✅ Wallet funded successfully!\nNew ${currency} Balance: ${amount} added`);
-    // Clean URL
+    showToast(`Wallet funded successfully! ${currency} ${amount} added`, 'success');
     window.history.replaceState({}, document.title, "/");
   }
   if(params.get('success') === 'false'){
-    alert('❌ Payment failed. Please try again.');
+    showToast('Payment failed. Please try again.', 'error');
     window.history.replaceState({}, document.title, "/");
   }
 
-  // 2. Load dashboard if logged in
+  // 2. Protect routes
+  const protectedPages = ['/', '/dashboard.html'];
+  if(!token && protectedPages.includes(window.location.pathname)){
+    window.location.href = '/login.html';
+  }
+
+  // 3. Load dashboard if logged in
   if(token && document.getElementById('dashboard')){
     loadDashboard();
   }
+
+  // 4. Attach event listeners to buttons
+  const loginBtn = document.getElementById('loginBtn');
+  const registerBtn = document.getElementById('registerBtn');
+  const fundBtn = document.getElementById('fundBtn');
+  const sendBtn = document.getElementById('sendBtn');
+  const verifyBvnBtn = document.getElementById('verifyBvnBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  if(loginBtn) loginBtn.addEventListener('click', login);
+  if(registerBtn) registerBtn.addEventListener('click', register);
+  if(fundBtn) fundBtn.addEventListener('click', fundWallet);
+  if(sendBtn) sendBtn.addEventListener('click', sendMoney);
+  if(verifyBvnBtn) verifyBvnBtn.addEventListener('click', verifyBVN);
+  if(logoutBtn) logoutBtn.addEventListener('click', logout);
 });
 
 // ===================
-// LOAD DASHBOARD DATA - RESTORED FROM OLD APP
+// LOGOUT
+// ===================
+function logout() {
+  localStorage.clear();
+  showToast('Logged out successfully', 'success');
+  setTimeout(() => window.location.href = '/login.html', 1000);
+}
+
+// ===================
+// LOAD DASHBOARD DATA
 // ===================
 async function loadDashboard() {
   try {
@@ -59,35 +109,42 @@ async function loadDashboard() {
 
     if(data.success){
       const user = data.user;
-      // Show old app fields
-      document.getElementById('fullName').textContent = user.fullName;
-      document.getElementById('email').textContent = user.email;
-      document.getElementById('walletId').textContent = user.walletId; // ✅ RESTORED
+      document.getElementById('fullName').textContent = user.fullName || 'N/A';
+      document.getElementById('email').textContent = user.email || 'N/A';
+      document.getElementById('walletId').textContent = user.walletId || 'N/A'; 
       document.getElementById('kycStatus').textContent = user.kycTier === 1 ? 'KYC TIER 1 VERIFIED' : 'UNVERIFIED';
 
-      // Show multi-currency balances
-      document.getElementById('balanceNGN').textContent = `₦${user.balances.NGN.toFixed(2)}`;
-      document.getElementById('balanceGHS').textContent = `GH₵${user.balances.GHS.toFixed(2)}`;
-      document.getElementById('balanceKES').textContent = `KSh${user.balances.KES.toFixed(2)}`;
-      document.getElementById('balanceUSD').textContent = `$${user.balances.USD.toFixed(2)}`;
-      document.getElementById('balanceEUR').textContent = `€${user.balances.EUR.toFixed(2)}`;
-      document.getElementById('balanceGBP').textContent = `£${user.balances.GBP.toFixed(2)}`;
+      // Multi-currency balances with safety check
+      document.getElementById('balanceNGN').textContent = `₦${(user.balances?.NGN || 0).toFixed(2)}`;
+      document.getElementById('balanceGHS').textContent = `GH₵${(user.balances?.GHS || 0).toFixed(2)}`;
+      document.getElementById('balanceKES').textContent = `KSh${(user.balances?.KES || 0).toFixed(2)}`;
+      document.getElementById('balanceUSD').textContent = `$${(user.balances?.USD || 0).toFixed(2)}`;
+      document.getElementById('balanceEUR').textContent = `€${(user.balances?.EUR || 0).toFixed(2)}`;
+      document.getElementById('balanceGBP').textContent = `£${(user.balances?.GBP || 0).toFixed(2)}`;
 
       loadTransactions();
+    } else {
+      showToast(data.message || 'Failed to load dashboard', 'error');
     }
   } catch(e){
     console.error(e);
+    showToast('Could not load dashboard', 'error');
   }
 }
 
 // ===================
-// REGISTER FUNCTION
+// REGISTER
 // ===================
 async function register() {
-  const email = document.getElementById('email').value;
+  const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
-  const fullName = document.getElementById('fullName').value;
+  const fullName = document.getElementById('fullName').value.trim();
   const errorMsg = document.getElementById('errorMsg');
+
+  if(!email || !password || !fullName) {
+    errorMsg.textContent = 'All fields are required';
+    return;
+  }
 
   try {
     const response = await fetchWithRetry(`${API_URL}/api/register`, {
@@ -99,7 +156,8 @@ async function register() {
     if (response.ok && data.success) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      window.location.href = '/?kyc=required';
+      showToast('Registration successful!', 'success');
+      setTimeout(() => window.location.href = '/?kyc=required', 1000);
     } else {
       errorMsg.textContent = data.message || 'Registration failed';
     }
@@ -109,12 +167,18 @@ async function register() {
 }
 
 // ===================
-// LOGIN FUNCTION
+// LOGIN
 // ===================
 async function login() {
-  const email = document.getElementById('email').value;
+  const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const errorMsg = document.getElementById('errorMsg');
+
+  if(!email || !password) {
+    errorMsg.textContent = 'Email and password required';
+    return;
+  }
+
   try {
     const response = await fetchWithRetry(`${API_URL}/api/login`, {
       method: 'POST',
@@ -125,11 +189,10 @@ async function login() {
     if (response.ok && data.success) {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      if (data.user.kycTier === 0) {
-        window.location.href = '/?kyc=required';
-      } else {
-        window.location.href = '/';
-      }
+      showToast('Login successful!', 'success');
+      setTimeout(() => {
+        window.location.href = data.user.kycTier === 0 ? '/?kyc=required' : '/';
+      }, 1000);
     } else {
       errorMsg.textContent = data.message || 'Login failed';
     }
@@ -139,7 +202,7 @@ async function login() {
 }
 
 // ===================
-// FUND WALLET - RESTORED + MULTI-CURRENCY
+// FUND WALLET
 // ===================
 async function fundWallet() {
   const amount = document.getElementById('fundAmount').value;
@@ -158,11 +221,11 @@ async function fundWallet() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ amount, currency })
+      body: JSON.stringify({ amount: Number(amount), currency })
     });
     const data = await res.json();
     if(data.success){
-      window.location.href = data.authorization_url; // Go to Paystack
+      window.location.href = data.authorization_url; 
     } else {
       errorMsg.textContent = data.message;
     }
@@ -172,14 +235,19 @@ async function fundWallet() {
 }
 
 // ===================
-// SEND MONEY - WALLETID OR EMAIL
+// SEND MONEY
 // ===================
 async function sendMoney() {
-  const recipient = document.getElementById('recipient').value; // email or walletId
+  const recipient = document.getElementById('recipient').value.trim(); 
   const amount = document.getElementById('sendAmount').value;
   const currency = document.getElementById('sendCurrency').value || 'NGN';
   const narration = document.getElementById('narration').value;
   const errorMsg = document.getElementById('sendError');
+
+  if(!recipient || !amount) {
+    errorMsg.textContent = 'Recipient and amount required';
+    return;
+  }
 
   try {
     const res = await fetchWithRetry(`${API_URL}/api/wallet/transfer`, {
@@ -188,12 +256,12 @@ async function sendMoney() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ recipient, amount, currency, narration })
+      body: JSON.stringify({ recipient, amount: Number(amount), currency, narration })
     });
     const data = await res.json();
     if(data.success){
-      alert('✅ ' + data.message);
-      loadDashboard(); // Refresh balance
+      showToast(data.message, 'success');
+      loadDashboard(); 
     } else {
       errorMsg.textContent = data.message;
     }
@@ -263,12 +331,14 @@ async function loadTransactions() {
     });
     const data = await res.json();
     if(data.success){
-      container.innerHTML = data.transactions.map(txn => `
-        <div class="txn">
-          <p><b>${txn.type}</b> ${txn.status === 'success' ? '+' : '-'}${txn.currency} ${txn.amount}</p>
-          <small>${new Date(txn.createdAt).toLocaleString()}</small>
-        </div>
-      `).join('');
+      container.innerHTML = data.transactions.length > 0 
+        ? data.transactions.map(txn => `
+          <div class="txn">
+            <p><b>${txn.type}</b> ${txn.status === 'success' ? '+' : '-'}${txn.currency} ${txn.amount}</p>
+            <small>${new Date(txn.createdAt).toLocaleString()}</small>
+          </div>
+        `).join('')
+        : '<p>No transactions yet</p>';
     }
   } catch(e){ console.error(e) }
-}
+                                }
