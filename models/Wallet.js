@@ -102,6 +102,4 @@ walletSchema.methods.getAllBalances = function() {
 
 // Compound indexing configurations for rapid transactional lookups
 walletSchema.index({ userId: 1 });
-walletSchema.index({ walletId: 1 }, { unique: true });
-
 module.exports = mongoose.model('Wallet', walletSchema);
