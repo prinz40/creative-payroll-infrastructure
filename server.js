@@ -11,21 +11,10 @@ const path = require('path');
 const app = express();
 
 // Trust proxy settings for secure headers over cloud proxy layers
-
 app.set('trust proxy', 1);
-app.use(express.json());
-
-// 1. SERVE STATIC FILES - This makes index.html, app.js load
-app.use(express.static(path.join(__dirname)));
-
-// 2. SEND INDEX.HTML FOR ROOT ROUTE
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
- 
 
 // =========================================
-// CORS PIPELINE - REINFORCED FOR STABILITY
+// CORS PIPELINE - MUST BE FIRST
 // =========================================
 app.use(cors({
   origin: [
@@ -38,6 +27,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Body parser - MUST be after CORS
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 1. SERVE STATIC FILES - This makes index.html, app.js load
+app.use(express.static(path.join(__dirname)));
+
+// 2. SEND INDEX.HTML FOR ROOT ROUTE
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // =========================================
 // RATE LIMITING - SAFEGUARD AGAINST DOS/BRUTE
@@ -50,7 +50,6 @@ const limiter = rateLimit({
   message: { success: false, message: 'Too many compliance requests. Please attempt again in 15 minutes.' }
 });
 app.use('/api/', limiter);
-
 // =========================================
 // DATABASE CONNECTION ENGINE
 // =========================================
