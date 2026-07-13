@@ -86,10 +86,11 @@ const auth = (req, res, next) => {
 // =========================================
 // ENDPOINT: USER REGISTRATION PIPELINE
 // =========================================
+
 app.post('/api/register', async (req, res, next) => {
   try {
     const { email, password, fullName } = req.body;
-    
+
     if (!email || !password || !fullName || !email.trim() || !fullName.trim()) {
       return res.status(400).json({ success: false, message: 'All structural fields are required for onboarding' });
     }
@@ -111,14 +112,20 @@ app.post('/api/register', async (req, res, next) => {
       walletId: walletId
     });
 
-    await Wallet.create({ 
-      userId: user._id, 
-      walletId: walletId,
-      balances: { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 }
-    });
+    try {
+      await Wallet.create({ 
+        userId: user._id, 
+        walletId: walletId,
+        balances: { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 }
+      });
+    } catch(walletErr) {
+      // ROLLBACK: if wallet fails, delete user so we can retry
+      await User.deleteOne({_id: user._id});
+      throw walletErr;
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    
+
     res.status(201).json({ 
       success: true, 
       token, 
@@ -132,10 +139,10 @@ app.post('/api/register', async (req, res, next) => {
       } 
     });
   } catch(e) { 
-    next(e);
+    console.error(e);
+    res.status(500).json({ success: false, message: e.message || 'Server error during registration' });
   }
 });
-
 // =========================================
 // ENDPOINT: ACCOUNT VALIDATION / LOGIN
 // =========================================
