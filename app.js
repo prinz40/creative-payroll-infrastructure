@@ -142,7 +142,7 @@ async function handleLogin() {
     setLoadingState(loginBtn, true, 'Authenticating...');
     errorMsg.innerText = '';
 
-    const response = await fetch(`${API_URL}/api/login`, {
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -187,7 +187,7 @@ async function handleRegister() {
     setLoadingState(registerBtn, true, 'Processing Profiling...');
     errorMsg.innerText = '';
 
-    const response = await fetch(`${API_URL}/api/register`, {
+    const response = await fetch(`${API_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fullName, email, password })
@@ -220,10 +220,10 @@ async function loadDashboard() {
   if (!token) return;
 
   try {
-    const response = await fetch(`${API_URL}/api/user`, {
+    const response = await fetch(`${API_URL}/user`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` }
-    });
+});
 
     const data = await response.json();
 
