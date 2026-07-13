@@ -288,3 +288,8 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
 
 // =========================================
 // ENDPOINT: AUDIT HISTORICAL LOGS
+// Start Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
