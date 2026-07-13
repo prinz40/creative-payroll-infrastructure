@@ -1,9 +1,7 @@
 // ============================================================================
 // CONFIG - GLOBAL APPLICATION SETTING RAILS
 // ============================================================================
-const API_URL = 'https://' + 
-  'creative-payroll-infrastructure' + 
-  '.onrender.com';
+const API_URL = '/api';
 
 let token = localStorage.getItem('token');
 let isLoginMode = true;
