@@ -7,79 +7,104 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
 body { background: #f5f5f5; }
-.container { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; }
-.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; }
-.btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+.container { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px 20px; text-align: center; }
+.btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s ease; }
+.btn:hover { background: #556ee6; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.input, .select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-top: 10px; }
-.card { background: white; padding: 15px; margin: 10px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.hidden { display: none; }
-.balance { font-size: 22px; font-weight: bold; color: #667eea; }
-.currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.currency-card { background: #f0f4ff; padding: 10px; border-radius: 8px; text-align: center; }
-.txn { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-.success { color: #2ed573; } .pending { color: #ffa502; } .failed { color: #ff4757; }
-.kyc-badge { background: #2ed573; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
-.kyc-pending { background: #ffa502; color: white; padding: 4px 8px; border-radius: 20px; font-size: 12px; }
-.wallet-id { background: #eee; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 12px; }
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 20px; border-radius: 8px; z-index: 999; }
+.input-group { position: relative; width: 100%; margin-top: 10px; }
+.input, .select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fff; }
+.input:focus, .select:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
+.password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #777; cursor: pointer; font-size: 14px; display: none; }
+.card { background: white; padding: 20px; margin: 15px 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.hidden { display: none !important; }
+.balance { font-size: 22px; font-weight: bold; color: #667eea; margin-top: 4px; }
+.currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.currency-card { background: #f0f4ff; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #e0e8ff; }
+.txn { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+.success { color: #2ed573; font-weight: 600; } .pending { color: #ffa502; font-weight: 600; } .failed { color: #ff4757; font-weight: 600; }
+.kyc-badge { background: #2ed573; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.kyc-pending { background: #ffa502; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.wallet-id { background: #eee; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #333; }
+#toastContainer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; }
+.toast { background: #333; color: white; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; animation: slideUp 0.3s ease; }
 .toast.success { background: #2ed573; } .toast.error { background: #ff4757; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
 </head>
 <body>
-<div class="container">
-  <div class="header"><h1>CreativePay</h1><p style="font-size:12px">Beat Payoneer + Wise 💪</p></div>
-  
-<!-- AUTH SECTION -->
-<div id="authSection" class="card">
-  <h2 id="authTitle">Login</h2>
-  <input type="text" id="fullName" class="input hidden" placeholder="Full Name">
-  <input type="email" id="email" class="input" placeholder="Email">
-  <input type="password" id="password" class="input" placeholder="Password">
-  <p id="errorMsg" style="color:red; font-size:12px; margin-top:5px"></p>
-  
-  <button class="btn" id="loginBtn">Login</button>
-  <button class="btn hidden" id="registerBtn">Register</button>
 
-  <p style="text-align:center; margin-top:10px;">
-    <a href="#" id="toggleAuthLink">Don't have an account? Register</a>
-  </p>
-</div>
+<div class="container">
+  <div class="header">
+    <h1>CreativePay</h1>
+    <p style="font-size:12px; opacity: 0.9; margin-top: 4px;">Global Cross-Border Core • Next-Gen Payment Rail 💪</p>
+  </div>
+
+  <!-- AUTH SECTION -->
+  <div id="authSection" class="card">
+    <h2 id="authTitle" style="margin-bottom: 10px; color: #333;">Login</h2>
+    
+    <div class="input-group hidden" id="nameGroup">
+      <input type="text" id="fullName" class="input" placeholder="Full Name">
+    </div>
+    
+    <div class="input-group">
+      <input type="email" id="email" class="input" placeholder="Email Address">
+    </div>
+    
+    <div class="input-group" style="position: relative;">
+      <input type="password" id="password" class="input" placeholder="Password">
+      <button type="button" id="togglePasswordBtn" class="password-toggle" style="display: block;">Show</button>
+    </div>
+    
+    <p id="errorMsg" style="color:red; font-size:12px; margin-top:8px; font-weight: 500;"></p>
+
+    <!-- Isolated buttons to avoid form execution conflicts -->
+    <button class="btn" id="loginBtn">Login</button>
+    <button class="btn hidden" id="registerBtn">Register Account</button>
+
+    <p style="text-align:center; margin-top:15px; font-size: 14px;">
+      <a href="#" id="toggleAuthLink" style="color: #667eea; text-decoration: none; font-weight: 500;">Don't have an account? Register</a>
+    </p>
+  </div>
 
   <!-- BVN VERIFICATION SECTION -->
   <div id="bvnSection" class="card hidden">
-    <h2>Verify BVN</h2>
+    <h2 style="color: #333; margin-bottom: 5px;">Verify Compliance</h2>
+    <p style="font-size: 13px; color: gray; margin-bottom: 10px;">To enable foreign accounts, complete your identity verification.</p>
     <input type="text" id="bvnInput" class="input" placeholder="11 Digit BVN" maxlength="11">
     <p id="bvnError" style="color:red; font-size:12px; margin-top:5px; display:none"></p>
     <p id="bvnSuccess" style="color:green; font-size:12px; margin-top:5px; display:none"></p>
-    <button class="btn" id="verifyBvnBtn">Verify BVN</button>
+    <button class="btn" id="verifyBvnBtn">Verify BVN Data</button>
   </div>
 
   <!-- MAIN DASHBOARD -->
   <div id="dashboard" class="hidden">
     <div class="card">
-      <h3>Welcome, <span id="userDispName">User</span></h3>
-      <p style="color:gray; font-size:14px" id="userDispEmail"></p>
-      <p style="margin-top:8px"><b>Wallet ID:</b> <span id="walletId" class="wallet-id"></span></p>
-      <p style="margin-top:8px"><b>KYC Status:</b> <span id="kycStatus" class="kyc-badge">Verified</span></p>
+      <h3 style="color: #333;">Welcome, <span id="userDispName">User</span></h3>
+      <p style="color:gray; font-size:14px; margin-top: 2px;" id="userDispEmail"></p>
+      <p style="margin-top:12px"><b>Account ID:</b> <span id="walletId" class="wallet-id"></span></p>
+      <p style="margin-top:12px; display: flex; align-items: center; gap: 8px;">
+        <b>KYC tier:</b> <span id="kycStatus" class="kyc-badge">Verified</span>
+      </p>
     </div>
 
     <div class="card">
-      <h3>Multi-Currency Wallet</h3>
+      <h3 style="color: #333; margin-bottom: 5px;">Multi-Currency Settlement Rails</h3>
       <div class="currency-grid">
-        <div class="currency-card"><small>NGN</small><div id="balanceNGN" class="balance">0.00</div></div>
-        <div class="currency-card"><small>GHS</small><div id="balanceGHS" class="balance">0.00</div></div>
-        <div class="currency-card"><small>KES</small><div id="balanceKES" class="balance">0.00</div></div>
-        <div class="currency-card"><small>USD</small><div id="balanceUSD" class="balance">0.00</div></div>
-        <div class="currency-card"><small>EUR</small><div id="balanceEUR" class="balance">0.00</div></div>
-        <div class="currency-card"><small>GBP</small><div id="balanceGBP" class="balance">0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">NGN (Naira)</small><div id="balanceNGN" class="balance">₦0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">GHS (Cedi)</small><div id="balanceGHS" class="balance">¢0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">KES (Shilling)</small><div id="balanceKES" class="balance">KSh0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">USD (Dollar)</small><div id="balanceUSD" class="balance">$0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">EUR (Euro)</small><div id="balanceEUR" class="balance">€0.00</div></div>
+        <div class="currency-card"><small style="color: gray; font-weight: 600;">GBP (Pound)</small><div id="balanceGBP" class="balance">£0.00</div></div>
       </div>
     </div>
 
     <div class="card">
-      <h3>Fund Wallet</h3>
+      <h3 style="color: #333;">Fund Liquidity</h3>
       <input type="number" id="fundAmount" class="input" placeholder="Amount Min 100">
-      <select id="fundCurrency" class="select">
+      <select id="fundCurrency" class="select" style="margin-top: 10px;">
         <option value="NGN">NGN - Nigerian Naira</option>
         <option value="GHS">GHS - Ghana Cedi</option>
         <option value="KES">KES - Kenyan Shilling</option>
@@ -88,14 +113,14 @@ body { background: #f5f5f5; }
         <option value="GBP">GBP - British Pound</option>
       </select>
       <p id="fundError" style="color:red; font-size:12px; margin-top:5px"></p>
-      <button class="btn" id="fundBtn">Fund Wallet</button>
+      <button class="btn" id="fundBtn">Initialize Deposit</button>
     </div>
 
     <div class="card">
-      <h3>Send Money</h3>
+      <h3>Global Remittance Pipeline</h3>
       <input type="text" id="recipient" class="input" placeholder="Recipient Email OR Wallet ID">
-      <input type="number" id="sendAmount" class="input" placeholder="Amount">
-      <select id="sendCurrency" class="select">
+      <input type="number" id="sendAmount" class="input" placeholder="Transfer Amount" style="margin-top: 10px;">
+      <select id="sendCurrency" class="select" style="margin-top: 10px;">
         <option value="NGN">NGN</option>
         <option value="GHS">GHS</option>
         <option value="KES">KES</option>
@@ -103,20 +128,25 @@ body { background: #f5f5f5; }
         <option value="EUR">EUR</option>
         <option value="GBP">GBP</option>
       </select>
-      <input type="text" id="narration" class="input" placeholder="Narration - Optional">
+      <input type="text" id="narration" class="input" placeholder="Reference Memo (Optional)" style="margin-top: 10px;">
       <p id="sendError" style="color:red; font-size:12px; margin-top:5px"></p>
-      <button class="btn" id="sendBtn">Send</button>
+      <button class="btn" id="sendBtn">Execute Payout</button>
     </div>
 
     <div class="card">
-      <h3>Transaction History</h3>
-      <div id="transactionList">No recent transactions.</div>
+      <h3 style="margin-bottom: 10px;">Audit Log / Ledgers</h3>
+      <div id="transactionList" style="font-size: 14px; color: #555;">No ledger items recorded.</div>
     </div>
 
-    <button class="btn" style="background:#ff4757" id="logoutBtn">Logout</button>
+    <div style="padding: 0 10px 20px 10px;">
+      <button class="btn" style="background:#ff4757" id="logoutBtn">Secure Terminate Session</button>
+    </div>
   </div>
 </div>
-<script src="app.js?v=4"></script>
 
+<!-- Container where programmatic professional notifications pop up -->
+<div id="toastContainer"></div>
+
+<script src="app.js?v=4"></script>
 </body>
-        </html>
+</html>
