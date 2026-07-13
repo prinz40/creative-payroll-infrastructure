@@ -262,3 +262,66 @@ async function loadTransactions() {
   if (!transactionList) return;
 
   try {
+    const response = await fetch(`${API_URL}/transactions`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    
+    if(data.success && data.transactions.length > 0) {
+      transactionList.innerHTML = data.transactions.map(tx => `
+        <div class="txn">
+          <div>
+            <div style="font-weight:600">${tx.type}</div>
+            <div style="font-size:12px; color:gray">${new Date(tx.date).toLocaleDateString()}</div>
+          </div>
+          <div class="${tx.status}">${tx.status}</div>
+        </div>
+      `).join('');
+    } else {
+      transactionList.innerText = 'No ledger items recorded.';
+    }
+  } catch (err) {
+    console.error(err);
+    transactionList.innerText = 'Could not load transactions';
+  }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+function setLoadingState(button, isLoading, text) {
+  if(!button) return;
+  button.disabled = isLoading;
+  button.innerText = text;
+}
+
+function clearAuthInputs() {
+  document.getElementById('email').value = '';
+  document.getElementById('password').value = '';
+  document.getElementById('fullName').value = '';
+}
+
+// ============================================================================
+// PLACEHOLDER HANDLERS - FILL THESE LATER
+// ============================================================================
+async function handleBvnVerification() {
+  showToast('BVN feature coming soon', 'success');
+}
+
+async function handleFundWallet() {
+  showToast('Fund wallet coming soon', 'success');
+}
+
+async function handleSendMoney() {
+  showToast('Send money coming soon', 'success');
+}
+
+function handleLogout() {
+  localStorage.removeItem('token');
+  token = null;
+  showUIState('auth');
+  showToast('Logged out successfully', 'success');
+}
+
+
