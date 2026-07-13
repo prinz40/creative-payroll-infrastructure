@@ -1,26 +1,25 @@
 // ============================================================================
 // CONFIG - GLOBAL APPLICATION SETTING RAILS
 // ============================================================================
-const API_URL = 'https://onrender.com';
+const API_URL = 'https://' + 
+  'creative-payroll-infrastructure' + 
+  '.onrender.com';
+
 let token = localStorage.getItem('token');
-let isLoginMode = true; // Tracks state toggle cleanly
+let isLoginMode = true;
 
 // ============================================================================
-// UX TOOL: PROFESSIONAL SNACKBAR / TOAST INFRASTRUCTURE
+// UX TOOL: COMPLIANCE STATUS TOAST PIPELINE
 // ============================================================================
 function showToast(message, type = 'success') {
   const container = document.getElementById('toastContainer');
-  if (!container) {
-    console.warn("Toast tracking container not found in DOM");
-    return;
-  }
+  if (!container) return;
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerText = message;
   container.appendChild(toast);
 
-  // Smooth entry and lifecycle destruction rules
   setTimeout(() => {
     toast.style.transition = 'opacity 0.4s ease';
     toast.style.opacity = '0';
@@ -29,14 +28,13 @@ function showToast(message, type = 'success') {
 }
 
 // ============================================================================
-// SPA STATE MANAGER: SWITCH VIEW WITHOUT REFRESHING OR 404 BLOCKS
+// SPA ROUTING ENGINE: UPDATE VIEW STATE MAPS CLEANLY
 // ============================================================================
 function showUIState(viewState) {
   const authSection = document.getElementById('authSection');
   const bvnSection = document.getElementById('bvnSection');
   const dashboard = document.getElementById('dashboard');
 
-  // Hard wipe layout views to standard baseline
   authSection.classList.add('hidden');
   bvnSection.classList.add('hidden');
   dashboard.classList.add('hidden');
@@ -45,24 +43,22 @@ function showUIState(viewState) {
     authSection.classList.remove('hidden');
   } else if (viewState === 'dashboard') {
     dashboard.classList.remove('hidden');
-    loadDashboard(); // Fire account sync logic immediately
+    loadDashboard();
   } else if (viewState === 'bvn') {
     bvnSection.classList.remove('hidden');
   }
 }
 
 // ============================================================================
-// INITIALIZER LAYER: HANDLES DOM EVENTS ON LOAD
+// PAGE LEVEL INITIALIZER LAYER
 // ============================================================================
 document.addEventListener('DOMContentLoaded', () => {
-  // Check baseline session data allocations
   if (token) {
     showUIState('dashboard');
   } else {
     showUIState('auth');
   }
 
-  // Setup Core Elements Form listeners
   const toggleAuthLink = document.getElementById('toggleAuthLink');
   const loginBtn = document.getElementById('loginBtn');
   const registerBtn = document.getElementById('registerBtn');
@@ -72,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const sendBtn = document.getElementById('sendBtn');
   const logoutBtn = document.getElementById('logoutBtn');
 
-  // FIXED CORE ACTION BUG: Explicitly handle view switching toggles
   if (toggleAuthLink) {
     toggleAuthLink.addEventListener('click', (e) => {
       e.preventDefault();
@@ -87,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sendBtn) sendBtn.addEventListener('click', handleSendMoney);
   if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
 
-  // Native password masking/unmasking toggle hook
   if (togglePasswordBtn) {
     togglePasswordBtn.addEventListener('click', () => {
       const passField = document.getElementById('password');
@@ -103,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// SUB-ENGINE: TOGGLE AUTH MODE LAYOUT FLOWS
+// UI STATE MACHINE: SWAP INTERFACE MODES
 // ============================================================================
 function toggleAuthMode() {
   isLoginMode = !isLoginMode;
@@ -115,7 +109,6 @@ function toggleAuthMode() {
   const toggleAuthLink = document.getElementById('toggleAuthLink');
   const errorMsg = document.getElementById('errorMsg');
 
-  // Dynamic state reset to avoid validation noise leaking over
   errorMsg.innerText = '';
 
   if (isLoginMode) {
@@ -134,7 +127,7 @@ function toggleAuthMode() {
 }
 
 // ============================================================================
-// CORE ENGINE: USER AUTHENTICATION / LOGIN ACTIONS
+// HANDLER: CORE USER AUTHENTICATION
 // ============================================================================
 async function handleLogin() {
   const email = document.getElementById('email').value.trim();
@@ -166,20 +159,19 @@ async function handleLogin() {
       showUIState('dashboard');
       clearAuthInputs();
     } else {
-      errorMsg.innerText = data.message || 'Login failed.';
+      errorMsg.innerText = data.message || 'Login credentials rejected.';
       showToast(data.message || 'Verification rejected', 'error');
     }
   } catch (err) {
     console.error(err);
-    errorMsg.innerText = 'Unable to establish link with payment core rail.';
-    showToast('Network routing error', 'error');
+    errorMsg.innerText = 'Communication link timeout on core infrastructure.';
   } finally {
     setLoadingState(loginBtn, false, 'Login');
   }
 }
 
 // ============================================================================
-// CORE ENGINE: IDENTITY PROVISIONING / REGISTRATION PIPELINE
+// HANDLER: ONBOARDING ACCREDITATION / REGISTRATION
 // ============================================================================
 async function handleRegister() {
   const fullName = document.getElementById('fullName').value.trim();
@@ -189,7 +181,7 @@ async function handleRegister() {
   const errorMsg = document.getElementById('errorMsg');
 
   if (!fullName || !email || !password) {
-    errorMsg.innerText = 'All structural inputs are required to open an account.';
+    errorMsg.innerText = 'All profiling credentials are required to onboard.';
     return;
   }
 
@@ -208,24 +200,23 @@ async function handleRegister() {
     if (data.success) {
       token = data.token;
       localStorage.setItem('token', token);
-      showToast('Account built successfully!', 'success');
+      showToast('Account setup complete!', 'success');
       showUIState('dashboard');
       clearAuthInputs();
     } else {
-      errorMsg.innerText = data.message || 'Onboarding failed.';
-      showToast(data.message || 'Registration dropped', 'error');
+      errorMsg.innerText = data.message || 'Onboarding registration failed.';
+      showToast(data.message || 'Registration rejected', 'error');
     }
   } catch (err) {
     console.error(err);
-    errorMsg.innerText = 'Unable to connect to onboarding service.';
-    showToast('Infrastructure timeout', 'error');
+    errorMsg.innerText = 'Unable to bind communication network with core rail.';
   } finally {
     setLoadingState(registerBtn, false, 'Register Account');
   }
 }
 
 // ============================================================================
-// PIPELINE ENGINE: DISPATCH DATA METRICS & SYNC PROFILE DATA
+// RUNTIME ENGINE: RETRIEVE PORTFOLIO ASSETS & BALANCES
 // ============================================================================
 async function loadDashboard() {
   if (!token) return;
@@ -239,8 +230,7 @@ async function loadDashboard() {
     const data = await response.json();
 
     if (data.success) {
-      // FIXED ELEMENT VALUE CRASH: Safely reference data tokens into descriptive nodes
-      document.getElementById('userDispName').innerText = data.user.name || 'User Node';
+      document.getElementById('userDispName').innerText = data.user.name || 'Core Account';
       document.getElementById('userDispEmail').innerText = data.user.email || '';
       document.getElementById('walletId').innerText = data.walletId || 'CP-ALLOCATING';
       
@@ -248,8 +238,29 @@ async function loadDashboard() {
       kycNode.innerText = data.user.kycTier || 'Unverified';
       kycNode.className = data.user.kycTier === 'Verified' ? 'kyc-badge' : 'kyc-pending';
 
-      // Load balances safely across mapped currency rails
       const b = data.balances || {};
       document.getElementById('balanceNGN').innerText = `₦${parseFloat(b.NGN || 0).toFixed(2)}`;
       document.getElementById('balanceGHS').innerText = `¢${parseFloat(b.GHS || 0).toFixed(2)}`;
       document.getElementById('balanceKES').innerText = `KSh${parseFloat(b.KES || 0).toFixed(2)}`;
+      document.getElementById('balanceUSD').innerText = `$${parseFloat(b.USD || 0).toFixed(2)}`;
+      document.getElementById('balanceEUR').innerText = `€${parseFloat(b.EUR || 0).toFixed(2)}`;
+      document.getElementById('balanceGBP').innerText = `£${parseFloat(b.GBP || 0).toFixed(2)}`;
+
+      loadTransactions();
+    } else {
+      handleLogout();
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Could not reload dashboard metrics safely', 'error');
+  }
+}
+
+// ============================================================================
+// AUDIT LEDGERS: DISPATCH TRANSACTION SYSTEM HISTORY
+// ============================================================================
+async function loadTransactions() {
+  const transactionList = document.getElementById('transactionList');
+  if (!transactionList) return;
+
+  try {
