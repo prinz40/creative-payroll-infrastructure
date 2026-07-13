@@ -10,7 +10,7 @@ const path = require('path');
 
 const app = express();
 
-// Trust proxy settings for secure headers over deployment layers (e.g., Render)
+// Trust proxy settings for secure headers over cloud proxy layers
 app.set('trust proxy', 1);
 app.use(express.json());
 
@@ -19,7 +19,7 @@ app.use(express.json());
 // =========================================
 app.use(cors({
   origin: [
-    'https://onrender.com',
+    'https://creative-payroll-infrastructure.onrender.com',
     'http://localhost:3000',
     'http://localhost:5173'
   ],
