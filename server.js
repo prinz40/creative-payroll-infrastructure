@@ -11,8 +11,18 @@ const path = require('path');
 const app = express();
 
 // Trust proxy settings for secure headers over cloud proxy layers
+
 app.set('trust proxy', 1);
 app.use(express.json());
+
+// 1. SERVE STATIC FILES - This makes index.html, app.js load
+app.use(express.static(path.join(__dirname)));
+
+// 2. SEND INDEX.HTML FOR ROOT ROUTE
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+ 
 
 // =========================================
 // CORS PIPELINE - REINFORCED FOR STABILITY
@@ -28,8 +38,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Static deployment route serving frontend root assets
-app.use(express.static(path.join(__dirname, '.')));
 
 // =========================================
 // RATE LIMITING - SAFEGUARD AGAINST DOS/BRUTE
