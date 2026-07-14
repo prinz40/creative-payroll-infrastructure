@@ -205,13 +205,13 @@ app.post('/api/deposit', auth, async (req, res, next) => {
     
     // Create transaction
     await Txn.create({
-      userId: req.user.id,
-      walletId: wallet.walletId,
-      type: 'credit',
-      amount: cleanAmount,
-      currency: targetCurrency,
-      description: `Deposit of ${cleanAmount} ${targetCurrency}`
-    });
+  userId: req.user.id,
+  walletId: wallet.walletId,
+  type: 'Deposit',
+  amount: cleanAmount,
+  currency: targetCurrency,
+  description: `Funded wallet with ${cleanAmount} ${targetCurrency}`
+});
 
     res.json({ 
       success: true, 
