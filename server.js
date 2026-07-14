@@ -10,12 +10,9 @@ const path = require('path');
 
 const app = express();
 
-// Trust proxy settings for secure headers over cloud proxy layers
 app.set('trust proxy', 1);
 
-// =========================================
-// CORS PIPELINE - MUST BE FIRST
-// =========================================
+// CORS
 app.use(cors({
   origin: [
     'https://creative-payroll-infrastructure.onrender.com',
@@ -27,21 +24,18 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Body parser - MUST be after CORS
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 1. SERVE STATIC FILES - This makes index.html, app.js load
+// SERVE STATIC FILES
 app.use(express.static(path.join(__dirname)));
 
-// 2. SEND INDEX.HTML FOR ROOT ROUTE
+// SEND INDEX.HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// =========================================
-// RATE LIMITING - SAFEGUARD AGAINST DOS/BRUTE
-// =========================================
+// RATE LIMITING
 const limiter = rateLimit({ 
   windowMs: 15 * 60 * 1000, 
   max: 150, 
@@ -50,28 +44,24 @@ const limiter = rateLimit({
   message: { success: false, message: 'Too many compliance requests. Please attempt again in 15 minutes.' }
 });
 app.use('/api/', limiter);
-// =========================================
-// DATABASE CONNECTION ENGINE
-// =========================================
+
+// DATABASE
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Operational Database Cluster Linked Successfully'))
-  .catch(err => {
+ .then(() => console.log('✅ Operational Database Cluster Linked Successfully'))
+ .catch(err => {
     console.error('❌ Critical Database Connection Error: ', err.message);
     process.exit(1);
   });
 
-// Schema imports
 const Wallet = require('./models/Wallet');
 const User = require('./models/User');
 const Txn = require('./models/Transaction');
 
-// =========================================
-// AUTHENTICATION INTERCEPTOR MIDDLEWARE
-// =========================================
+// AUTH MIDDLEWARE
 const auth = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader ||!authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ success: false, message: 'Access Denied: No Token Signature Provided' });
     }
     const token = authHeader.split(' ')[1];
@@ -83,24 +73,18 @@ const auth = (req, res, next) => {
   }
 };
 
-// =========================================
-// ENDPOINT: USER REGISTRATION PIPELINE
-// =========================================
-
+// REGISTER
 app.post('/api/register', async (req, res, next) => {
   try {
     const { email, password, fullName } = req.body;
-
-    if (!email || !password || !fullName || !email.trim() || !fullName.trim()) {
+    if (!email ||!password ||!fullName ||!email.trim() ||!fullName.trim()) {
       return res.status(400).json({ success: false, message: 'All structural fields are required for onboarding' });
     }
-
     const normalizedEmail = email.toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(400).json({ success: false, message: 'An identity record already exists with this email address' });
     }
-
     const salt = await bcrypt.genSalt(12);
     const hashed = await bcrypt.hash(password, salt);
     const walletId = 'CP' + crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -119,7 +103,6 @@ app.post('/api/register', async (req, res, next) => {
         balances: { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 }
       });
     } catch(walletErr) {
-      // ROLLBACK: if wallet fails, delete user so we can retry
       await User.deleteOne({_id: user._id});
       throw walletErr;
     }
@@ -143,25 +126,20 @@ app.post('/api/register', async (req, res, next) => {
     res.status(500).json({ success: false, message: e.message || 'Server error during registration' });
   }
 });
-// =========================================
-// ENDPOINT: ACCOUNT VALIDATION / LOGIN
-// =========================================
+
+// LOGIN
 app.post('/api/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (!email ||!password) {
       return res.status(400).json({ success: false, message: 'Email and password profiles must be supplied' });
     }
-
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) return res.status(400).json({ success: false, message: 'Invalid authentication credentials provided' });
-
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(400).json({ success: false, message: 'Invalid authentication credentials provided' });
-
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const wallet = await Wallet.findOne({ userId: user._id });
-
     res.json({ 
       success: true, 
       token, 
@@ -170,7 +148,7 @@ app.post('/api/login', async (req, res, next) => {
         name: user.name, 
         email: user.email, 
         walletId: user.walletId, 
-        balances: wallet ? wallet.balances : { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 }, 
+        balances: wallet? wallet.balances : { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 }, 
         kycTier: user.kycTier 
       } 
     });
@@ -179,43 +157,47 @@ app.post('/api/login', async (req, res, next) => {
   }
 });
 
-// =========================================
-// ENDPOINT: FETCH PROFILE & LEDGERS
-// =========================================
+// GET USER
 app.get('/api/user', auth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ success: false, message: 'User runtime context missing' });
-
     const wallet = await Wallet.findOne({ userId: req.user.id });
     res.json({ 
       success: true, 
       user, 
-      balances: wallet ? wallet.balances : { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 },
-      walletId: wallet ? wallet.walletId : null
+      balances: wallet? wallet.balances : { NGN: 0, GHS: 0, KES: 0, USD: 0, EUR: 0, GBP: 0 },
+      walletId: wallet? wallet.walletId : null
     });
   } catch (e) { 
     next(e);
   }
 });
 
-// =========================================
-// ENDPOINT: LIQUIDITY INJECTION / INITIALIZE DEPOSIT
-// =========================================
+// NEW: GET TRANSACTIONS - THIS FIXES "COULD NOT LOAD"
+app.get('/api/transactions', auth, async (req, res, next) => {
+  try {
+    const transactions = await Txn.find({ userId: req.user.id }).sort({ date: -1 }).limit(50);
+    res.json({ success: true, transactions });
+  } catch (e) { 
+    next(e);
+  }
+});
+
+// FUND - FIXED BUG
 app.post('/api/wallet/fund', auth, async (req, res, next) => {
   try {
     const { amount, currency } = req.body;
     const cleanAmount = parseFloat(amount);
-    
     if (isNaN(cleanAmount) || cleanAmount < 100) {
       return res.status(400).json({ success: false, message: 'Minimum funding threshold is 100 units' });
     }
-
     const targetCurrency = (currency || 'NGN').toUpperCase();
     const wallet = await Wallet.findOne({ userId: req.user.id });
     if (!wallet) return res.status(404).json({ success: false, message: 'User wallet record allocation missing' });
 
-    const authorization_url = `https://paystack.com{crypto.randomBytes(8).toString('hex')}`;
+    // FIXED: was missing backticks
+    const authorization_url = `https://paystack.com/pay/${crypto.randomBytes(8).toString('hex')}`;
 
     res.json({ 
       success: true, 
@@ -227,47 +209,36 @@ app.post('/api/wallet/fund', auth, async (req, res, next) => {
   }
 });
 
-// =========================================
-// ENDPOINT: CROSS-BORDER WIRE TRANSACTIONS
-// =========================================
+// TRANSFER
 app.post('/api/wallet/transfer', auth, async (req, res, next) => {
   try {
     const { recipient, amount, currency, narration } = req.body; 
     const transferAmount = parseFloat(amount);
-
     if (!recipient || isNaN(transferAmount) || transferAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Valid parsing parameters for recipient and transaction amounts required' });
     }
-
     const targetCurrency = (currency || 'NGN').toUpperCase();
     const senderWallet = await Wallet.findOne({ userId: req.user.id });
     if (!senderWallet) return res.status(404).json({ success: false, message: 'Sender processing ledger node not found' });
-
     let recipientWallet = await Wallet.findOne({ walletId: recipient.trim().toUpperCase() });
-    
     if (!recipientWallet) {
       const recipientUser = await User.findOne({ email: recipient.toLowerCase().trim() });
       if (recipientUser) {
         recipientWallet = await Wallet.findOne({ userId: recipientUser._id });
       }
     }
-
     if (!recipientWallet) {
       return res.status(404).json({ success: false, message: 'Target profile account or settlement wallet not discovered' });
     }
-
     if (senderWallet.walletId === recipientWallet.walletId) {
       return res.status(400).json({ success: false, message: 'Self-targeted routing is restricted on core rails' });
     }
-
     const senderCurrentBalance = senderWallet.balances[targetCurrency] || 0;
     if (senderCurrentBalance < transferAmount) {
       return res.status(400).json({ success: false, message: `Insufficient liquidity to clear ${transferAmount} ${targetCurrency}` });
     }
-
     await Wallet.deductBalance(senderWallet.walletId, targetCurrency, transferAmount);
     await Wallet.addBalance(recipientWallet.walletId, targetCurrency, transferAmount);
-
     await Txn.create({
       userId: req.user.id,
       walletId: senderWallet.walletId,
@@ -276,7 +247,6 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
       currency: targetCurrency,
       description: narration || `Remittance dispatch to ${recipientWallet.walletId}`
     });
-
     await Txn.create({
       userId: recipientWallet.userId,
       walletId: recipientWallet.walletId,
@@ -285,16 +255,12 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
       currency: targetCurrency,
       description: narration || `Remittance intake from ${senderWallet.walletId}`
     });
-
     res.json({ success: true, message: 'Settlement execution across rail completed successfully' });
   } catch (e) { 
     next(e);
   }
 });
 
-// =========================================
-// ENDPOINT: AUDIT HISTORICAL LOGS
-// Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
