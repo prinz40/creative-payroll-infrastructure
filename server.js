@@ -289,6 +289,19 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
   return app._router.handle(req, res, next);
 });
 
+// KYC BVN VERIFICATION
+app.post('/api/kyc/verify-bvn', auth, async (req, res, next) => {
+  try {
+    const { bvn } = req.body;
+    if (!bvn || bvn.length !== 11) {
+      return res.status(400).json({ success: false, message: 'Invalid BVN. Must be 11 digits' });
+    }
+    // For demo: we auto-verify. Later we connect real BVN API
+    await User.update({ kycStatus: 'Verified', bvn: bvn }, { where: { id: req.user.id } });
+    res.json({ success: true, message: 'BVN Verified Successfully', kycTier: 'Verified' });
+  } catch (err) { next(err); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
