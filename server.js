@@ -290,16 +290,29 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
 });
 
 // KYC BVN VERIFICATION
-app.post('/api/kyc/verify-bvn', auth, async (req, res, next) => {
+app.post('/api/kyc/verify-bvn', auth, async (req, res) => {
   try {
     const { bvn } = req.body;
     if (!bvn || bvn.length !== 11) {
       return res.status(400).json({ success: false, message: 'Invalid BVN. Must be 11 digits' });
     }
-    // For demo: we auto-verify. Later we connect real BVN API
-    await User.update({ kycStatus: 'Verified', bvn: bvn }, { where: { id: req.user.id } });
-    res.json({ success: true, message: 'BVN Verified Successfully', kycTier: 'Verified' });
-  } catch (err) { next(err); }
+    
+    // Mongoose way to update
+    const user = await User.findByIdAndUpdate(
+      req.user.id, 
+      { kycTier: 'Verified', bvn: bvn }, 
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({ success: true, message: 'BVN Verified Successfully', kycTier: user.kycTier });
+  } catch (err) { 
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error during KYC' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
