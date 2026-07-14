@@ -235,8 +235,31 @@ async function loadDashboard() {
       document.getElementById('walletId').innerText = data.walletId || 'CP-ALLOCATING';
       
       const kycNode = document.getElementById('kycStatus');
-      kycNode.innerText = data.user.kycTier || 'Unverified';
-      kycNode.className = data.user.kycTier === 'Verified' ? 'kyc-badge' : 'kyc-pending';
+kycNode.innerText = data.user.kycTier || 'Unverified';
+kycNode.className = data.user.kycTier === 'Verified' ? 'kyc-badge' : 'kyc-pending';
+
+// ADD KYC BUTTON IF NOT VERIFIED
+if(data.user.kycTier !== 'Verified') {
+  const kycBtn = document.createElement('button');
+  kycBtn.innerText = 'Verify BVN';
+  kycBtn.style.marginLeft = '10px';
+  kycBtn.onclick = showKycModal;
+  kycNode.parentNode.appendChild(kycBtn);
+}
+
+function showKycModal() {
+  const bvn = prompt("Enter your 11 digit BVN");
+  if(bvn) {
+    fetch(`${API}/api/kyc/verify-bvn`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+      body: JSON.stringify({bvn})
+    }).then(res => res.json()).then(data => {
+      alert(data.message);
+      if(data.success) window.location.reload();
+    });
+  }
+}
 
       const b = data.balances || {};
       document.getElementById('balanceNGN').innerText = `₦${parseFloat(b.NGN || 0).toFixed(2)}`;
