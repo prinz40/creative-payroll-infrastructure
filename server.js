@@ -47,8 +47,8 @@ app.use('/api/', limiter);
 
 // DATABASE
 mongoose.connect(process.env.MONGODB_URI)
- .then(() => console.log('✅ Operational Database Cluster Linked Successfully'))
- .catch(err => {
+.then(() => console.log('✅ Operational Database Cluster Linked Successfully'))
+.catch(err => {
     console.error('❌ Critical Database Connection Error: ', err.message);
     process.exit(1);
   });
@@ -174,7 +174,7 @@ app.get('/api/user', auth, async (req, res, next) => {
   }
 });
 
-// NEW: GET TRANSACTIONS - THIS FIXES "COULD NOT LOAD"
+// GET TRANSACTIONS
 app.get('/api/transactions', auth, async (req, res, next) => {
   try {
     const transactions = await Txn.find({ userId: req.user.id }).sort({ date: -1 }).limit(50);
@@ -184,8 +184,12 @@ app.get('/api/transactions', auth, async (req, res, next) => {
   }
 });
 
-// FUND - FIXED BUG
-app.post('/api/wallet/fund', auth, async (req, res, next) => {
+// ============================================================================
+// NEW ROUTES TO MATCH FRONTEND: /api/deposit AND /api/payout
+// ============================================================================
+
+// DEPOSIT - matches app.js
+app.post('/api/deposit', auth, async (req, res, next) => {
   try {
     const { amount, currency } = req.body;
     const cleanAmount = parseFloat(amount);
@@ -196,23 +200,32 @@ app.post('/api/wallet/fund', auth, async (req, res, next) => {
     const wallet = await Wallet.findOne({ userId: req.user.id });
     if (!wallet) return res.status(404).json({ success: false, message: 'User wallet record allocation missing' });
 
-    // FIXED: was missing backticks
-    const authorization_url = `https://paystack.com/pay/${crypto.randomBytes(8).toString('hex')}`;
+    // Add balance directly for now
+    await Wallet.addBalance(wallet.walletId, targetCurrency, cleanAmount);
+    
+    // Create transaction
+    await Txn.create({
+      userId: req.user.id,
+      walletId: wallet.walletId,
+      type: 'credit',
+      amount: cleanAmount,
+      currency: targetCurrency,
+      description: `Deposit of ${cleanAmount} ${targetCurrency}`
+    });
 
     res.json({ 
       success: true, 
-      authorization_url,
-      message: `Gateway URL compiled successfully for ${cleanAmount} ${targetCurrency}` 
+      message: `Deposit of ${cleanAmount} ${targetCurrency} successful` 
     });
   } catch (e) { 
     next(e);
   }
 });
 
-// TRANSFER
-app.post('/api/wallet/transfer', auth, async (req, res, next) => {
+// PAYOUT - matches app.js
+app.post('/api/payout', auth, async (req, res, next) => {
   try {
-    const { recipient, amount, currency, narration } = req.body; 
+    const { recipient, amount, currency, reference } = req.body; 
     const transferAmount = parseFloat(amount);
     if (!recipient || isNaN(transferAmount) || transferAmount <= 0) {
       return res.status(400).json({ success: false, message: 'Valid parsing parameters for recipient and transaction amounts required' });
@@ -220,6 +233,7 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
     const targetCurrency = (currency || 'NGN').toUpperCase();
     const senderWallet = await Wallet.findOne({ userId: req.user.id });
     if (!senderWallet) return res.status(404).json({ success: false, message: 'Sender processing ledger node not found' });
+    
     let recipientWallet = await Wallet.findOne({ walletId: recipient.trim().toUpperCase() });
     if (!recipientWallet) {
       const recipientUser = await User.findOne({ email: recipient.toLowerCase().trim() });
@@ -237,15 +251,17 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
     if (senderCurrentBalance < transferAmount) {
       return res.status(400).json({ success: false, message: `Insufficient liquidity to clear ${transferAmount} ${targetCurrency}` });
     }
+    
     await Wallet.deductBalance(senderWallet.walletId, targetCurrency, transferAmount);
     await Wallet.addBalance(recipientWallet.walletId, targetCurrency, transferAmount);
+    
     await Txn.create({
       userId: req.user.id,
       walletId: senderWallet.walletId,
       type: 'debit',
       amount: transferAmount,
       currency: targetCurrency,
-      description: narration || `Remittance dispatch to ${recipientWallet.walletId}`
+      description: reference || `Payout to ${recipientWallet.walletId}`
     });
     await Txn.create({
       userId: recipientWallet.userId,
@@ -253,12 +269,24 @@ app.post('/api/wallet/transfer', auth, async (req, res, next) => {
       type: 'credit',
       amount: transferAmount,
       currency: targetCurrency,
-      description: narration || `Remittance intake from ${senderWallet.walletId}`
+      description: reference || `Payout from ${senderWallet.walletId}`
     });
-    res.json({ success: true, message: 'Settlement execution across rail completed successfully' });
+    
+    res.json({ success: true, message: 'Payout executed successfully' });
   } catch (e) { 
     next(e);
   }
+});
+
+// OLD ROUTES - KEEP FOR BACKWARD COMPATIBILITY
+app.post('/api/wallet/fund', auth, async (req, res, next) => {
+  req.url = '/api/deposit';
+  return app._router.handle(req, res, next);
+});
+
+app.post('/api/wallet/transfer', auth, async (req, res, next) => {
+  req.url = '/api/payout';
+  return app._router.handle(req, res, next);
 });
 
 const PORT = process.env.PORT || 3000;
