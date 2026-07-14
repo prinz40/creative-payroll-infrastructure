@@ -8,10 +8,21 @@
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
 body { background: #f5f5f5; }
 .container { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; }
-.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px 20px; text-align: center; }
+
+/* UPDATED HEADER */
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
+.header-text h1 { font-size: 18px; margin: 0; }
+.header-text p { font-size: 10px; opacity: 0.9; margin: 0; }
+.logout-btn { background: white; color: #667eea; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.logout-btn:hover { background: #f0f4ff; }
+
 .btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s ease; }
 .btn:hover { background: #556ee6; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-danger { background: #ff4757; }
+.btn-danger:hover { background: #e03e4e; }
 .input-group { position: relative; width: 100%; margin-top: 10px; }
 .input, .select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fff; }
 .input:focus, .select:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
@@ -35,31 +46,37 @@ body { background: #f5f5f5; }
 <body>
 
 <div class="container">
+  <!-- UPDATED HEADER WITH LOGO + LOGOUT -->
   <div class="header">
-    <h1>CreativePay</h1>
-    <p style="font-size:12px; opacity: 0.9; margin-top: 4px;">Global Cross-Border Core • Next-Gen Payment Rail 💪</p>
+    <div class="header-left">
+      <img src="creativepay-logo.png" alt="CreativePay Logo" class="header-logo" />
+      <div class="header-text">
+        <h1>CreativePay</h1>
+        <p>Global Cross-Border Core</p>
+      </div>
+    </div>
+    <button class="logout-btn" id="logoutBtn">Logout</button>
   </div>
 
   <!-- AUTH SECTION -->
   <div id="authSection" class="card">
     <h2 id="authTitle" style="margin-bottom: 10px; color: #333;">Login</h2>
-    
+
     <div class="input-group hidden" id="nameGroup">
       <input type="text" id="fullName" class="input" placeholder="Full Name">
     </div>
-    
+
     <div class="input-group">
       <input type="email" id="email" class="input" placeholder="Email Address">
     </div>
-    
+
     <div class="input-group" style="position: relative;">
       <input type="password" id="password" class="input" placeholder="Password">
       <button type="button" id="togglePasswordBtn" class="password-toggle" style="display: block;">Show</button>
     </div>
-    
+
     <p id="errorMsg" style="color:red; font-size:12px; margin-top:8px; font-weight: 500;"></p>
 
-    <!-- Isolated buttons to avoid form execution conflicts -->
     <button class="btn" id="loginBtn">Login</button>
     <button class="btn hidden" id="registerBtn">Register Account</button>
 
@@ -138,13 +155,13 @@ body { background: #f5f5f5; }
       <div id="transactionList" style="font-size: 14px; color: #555;">No ledger items recorded.</div>
     </div>
 
+    <!-- MOVED TO SETTINGS AREA -->
     <div style="padding: 0 10px 20px 10px;">
-      <button class="btn" style="background:#ff4757" id="logoutBtn">Secure Terminate Session</button>
+      <button class="btn btn-danger" id="deleteAccountBtn">Delete Account</button>
     </div>
   </div>
 </div>
 
-<!-- Container where programmatic professional notifications pop up -->
 <div id="toastContainer"></div>
 
 <script src="app.js?v=4"></script>
