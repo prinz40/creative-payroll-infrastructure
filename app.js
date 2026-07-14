@@ -163,6 +163,7 @@ async function handleLogin() {
   } catch (err) {
     console.error(err);
     errorMsg.innerText = 'Communication link timeout on core infrastructure.';
+    showToast('Network error', 'error');
   } finally {
     setLoadingState(loginBtn, false, 'Login');
   }
@@ -208,6 +209,7 @@ async function handleRegister() {
   } catch (err) {
     console.error(err);
     errorMsg.innerText = 'Unable to bind communication network with core rail.';
+    showToast('Network error', 'error');
   } finally {
     setLoadingState(registerBtn, false, 'Register Account');
   }
@@ -223,7 +225,7 @@ async function loadDashboard() {
     const response = await fetch(`${API_URL}/user`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` }
-});
+    });
 
     const data = await response.json();
 
@@ -273,9 +275,9 @@ async function loadTransactions() {
         <div class="txn">
           <div>
             <div style="font-weight:600">${tx.type}</div>
-            <div style="font-size:12px; color:gray">${new Date(tx.date).toLocaleDateString()}</div>
+            <div style="font-size:12px; color:gray">${new Date(tx.date).toLocaleDateString()} ${new Date(tx.date).toLocaleTimeString()}</div>
           </div>
-          <div class="${tx.status}">${tx.status}</div>
+          <div class="${tx.status}">${tx.amount > 0 ? '+' : ''}₦${Math.abs(tx.amount).toFixed(2)} - ${tx.status}</div>
         </div>
       `).join('');
     } else {
@@ -303,25 +305,108 @@ function clearAuthInputs() {
 }
 
 // ============================================================================
-// PLACEHOLDER HANDLERS - FILL THESE LATER
+// HANDLER: BVN VERIFICATION
 // ============================================================================
 async function handleBvnVerification() {
   showToast('BVN feature coming soon', 'success');
 }
 
+// ============================================================================
+// HANDLER: FUND WALLET / DEPOSIT LIQUIDITY
+// ============================================================================
 async function handleFundWallet() {
-  showToast('Fund wallet coming soon', 'success');
+  const amount = document.getElementById('depositAmount').value;
+  const currency = document.getElementById('depositCurrency').value;
+  const fundBtn = document.getElementById('fundBtn');
+
+  if (!amount || amount < 100) {
+    showToast('Minimum deposit is 100', 'error');
+    return;
+  }
+
+  try {
+    setLoadingState(fundBtn, true, 'Processing...');
+
+    const response = await fetch(`${API_URL}/deposit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ amount: parseFloat(amount), currency })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`₦${amount} funded successfully!`, 'success');
+      document.getElementById('depositAmount').value = '';
+      loadDashboard(); // refresh balances
+      loadTransactions(); // refresh audit log
+    } else {
+      showToast(data.message || 'Deposit failed', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Network error during deposit', 'error');
+  } finally {
+    setLoadingState(fundBtn, false, 'Initialize Deposit');
+  }
 }
 
+// ============================================================================
+// HANDLER: GLOBAL REMITTANCE / PAYOUT
+// ============================================================================
 async function handleSendMoney() {
-  showToast('Send money coming soon', 'success');
+  const recipient = document.getElementById('recipient').value.trim();
+  const amount = document.getElementById('sendAmount').value;
+  const currency = document.getElementById('sendCurrency').value;
+  const reference = document.getElementById('reference').value;
+  const sendBtn = document.getElementById('sendBtn');
+
+  if (!recipient || !amount || amount < 10) {
+    showToast('Recipient and minimum amount 10 required', 'error');
+    return;
+  }
+
+  try {
+    setLoadingState(sendBtn, true, 'Sending...');
+
+    const response = await fetch(`${API_URL}/payout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ recipient, amount: parseFloat(amount), currency, reference })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      showToast(`₦${amount} sent to ${recipient}`, 'success');
+      document.getElementById('recipient').value = '';
+      document.getElementById('sendAmount').value = '';
+      document.getElementById('reference').value = '';
+      loadDashboard(); // refresh balances
+      loadTransactions(); // refresh audit log
+    } else {
+      showToast(data.message || 'Payout failed', 'error');
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Network error during payout', 'error');
+  } finally {
+    setLoadingState(sendBtn, false, 'Execute Payout');
+  }
 }
 
+// ============================================================================
+// HANDLER: SESSION TERMINATION
+// ============================================================================
 function handleLogout() {
   localStorage.removeItem('token');
   token = null;
   showUIState('auth');
   showToast('Logged out successfully', 'success');
 }
-
-
