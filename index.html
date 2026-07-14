@@ -40,7 +40,7 @@ body { background: #f5f5f5; }
 #toastContainer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; }
 .toast { background: #333; color: white; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; animation: slideUp 0.3s ease; }
 .toast.success { background: #2ed573; } .toast.error { background: #ff4757; }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
 </style>
 </head>
 <body>
@@ -120,8 +120,8 @@ body { background: #f5f5f5; }
 
     <div class="card">
       <h3 style="color: #333;">Fund Liquidity</h3>
-      <input type="number" id="fundAmount" class="input" placeholder="Amount Min 100">
-      <select id="fundCurrency" class="select" style="margin-top: 10px;">
+      <input type="number" id="depositAmount" class="input" placeholder="Amount Min 100">
+      <select id="depositCurrency" class="select" style="margin-top: 10px;">
         <option value="NGN">NGN - Nigerian Naira</option>
         <option value="GHS">GHS - Ghana Cedi</option>
         <option value="KES">KES - Kenyan Shilling</option>
@@ -145,7 +145,7 @@ body { background: #f5f5f5; }
         <option value="EUR">EUR</option>
         <option value="GBP">GBP</option>
       </select>
-      <input type="text" id="narration" class="input" placeholder="Reference Memo (Optional)" style="margin-top: 10px;">
+      <input type="text" id="reference" class="input" placeholder="Reference Memo (Optional)" style="margin-top: 10px;">
       <p id="sendError" style="color:red; font-size:12px; margin-top:5px"></p>
       <button class="btn" id="sendBtn">Execute Payout</button>
     </div>
@@ -164,6 +164,6 @@ body { background: #f5f5f5; }
 
 <div id="toastContainer"></div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
