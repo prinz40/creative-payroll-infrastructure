@@ -249,15 +249,20 @@ if(data.user.kycTier !== 'Verified') {
 
 function showKycModal() {
   const bvn = prompt("Enter your 11 digit BVN");
-  if(bvn) {
+  if(bvn && bvn.length === 11) {
     fetch(`${API}/api/kyc/verify-bvn`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
       body: JSON.stringify({bvn})
     }).then(res => res.json()).then(data => {
-      alert(data.message);
+      alert(data.message || data.error); // Show success OR error
       if(data.success) window.location.reload();
+    }).catch(err => {
+      alert("KYC Error: " + err.message); // This will show if API is blocked
+      console.error(err);
     });
+  } else {
+    alert("Please enter 11 digits");
   }
 }
 
