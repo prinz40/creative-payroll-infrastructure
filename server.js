@@ -178,7 +178,14 @@ app.get('/api/user', auth, async (req, res, next) => {
 app.get('/api/transactions', auth, async (req, res, next) => {
   try {
     const transactions = await Txn.find({ userId: req.user.id }).sort({ date: -1 }).limit(50);
-    res.json({ success: true, transactions });
+    
+    // FIX: Format date so it doesn't show "Invalid Date"
+    const formattedTxns = transactions.map(txn => ({
+      ...txn._doc,
+      date: new Date(txn.date).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })
+    }));
+
+    res.json({ success: true, transactions: formattedTxns });
   } catch (e) { 
     next(e);
   }
