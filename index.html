@@ -96,72 +96,87 @@ body { background: #f5f5f5; }
   </div>
 
   <!-- MAIN DASHBOARD -->
-  <div id="dashboard" class="hidden">
-    <div class="card">
-      <h3 style="color: #333;">Welcome, <span id="userDispName">User</span></h3>
-      <p style="color:gray; font-size:14px; margin-top: 2px;" id="userDispEmail"></p>
-      <p style="margin-top:12px"><b>Account ID:</b> <span id="walletId" class="wallet-id"></span></p>
-      <p style="margin-top:12px; display: flex; align-items: center; gap: 8px;">
-        <b>KYC tier:</b> <span id="kycStatus" class="kyc-badge">Verified</span>
-      </p>
+  <div class="dashboard">
+    <div class="header">
+        <div class="logo">
+            <img src="logo.png" alt="CreativePay"> CreativePay
+        </div>
+        <button id="logout-btn" class="btn-outline">Logout</button>
+    </div>
+
+    <div class="welcome-card">
+        <h2>Welcome, <span id="user-name">Test Final</span></h2>
+        <p id="user-email">testfinal123@gmail.com</p>
+        <p>Account ID: <span id="account-id" class="badge">CFA1A40882</span></p>
+        <p>KYC Tier: <span class="badge-verified">Verified</span></p>
+        
+        <!-- NEW: FACIAL VERIFICATION BUTTON -->
+        <button id="facial-verify-btn" class="btn-secondary" style="margin-top:10px; width:100%;">
+            📸 Start Facial Verification
+        </button>
     </div>
 
     <div class="card">
-      <h3 style="color: #333; margin-bottom: 5px;">Multi-Currency Settlement Rails</h3>
-      <div class="currency-grid">
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">NGN (Naira)</small><div id="balanceNGN" class="balance">₦0.00</div></div>
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">GHS (Cedi)</small><div id="balanceGHS" class="balance">¢0.00</div></div>
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">KES (Shilling)</small><div id="balanceKES" class="balance">KSh0.00</div></div>
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">USD (Dollar)</small><div id="balanceUSD" class="balance">$0.00</div></div>
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">EUR (Euro)</small><div id="balanceEUR" class="balance">€0.00</div></div>
-        <div class="currency-card"><small style="color: gray; font-weight: 600;">GBP (Pound)</small><div id="balanceGBP" class="balance">£0.00</div></div>
-      </div>
+        <h3>Multi-Currency Settlement Rails</h3>
+        <div class="currency-grid">
+            <div class="currency-item">NGN (Naira)<br><strong>₦1000.00</strong></div>
+            <div class="currency-item">GHS (Cedi)<br><strong>₵0.00</strong></div>
+            <div class="currency-item">KES (Shilling)<br><strong>KSh0.00</strong></div>
+            <div class="currency-item">USD (Dollar)<br><strong>$0.00</strong></div>
+            <div class="currency-item">EUR (Euro)<br><strong>€0.00</strong></div>
+            <div class="currency-item">GBP (Pound)<br><strong>£0.00</strong></div>
+        </div>
     </div>
 
     <div class="card">
-      <h3 style="color: #333;">Fund Liquidity</h3>
-      <input type="number" id="depositAmount" class="input" placeholder="Amount Min 100">
-      <select id="depositCurrency" class="select" style="margin-top: 10px;">
-        <option value="NGN">NGN - Nigerian Naira</option>
-        <option value="GHS">GHS - Ghana Cedi</option>
-        <option value="KES">KES - Kenyan Shilling</option>
-        <option value="USD">USD - US Dollar</option>
-        <option value="EUR">EUR - Euro</option>
-        <option value="GBP">GBP - British Pound</option>
-      </select>
-      <p id="fundError" style="color:red; font-size:12px; margin-top:5px"></p>
-      <button class="btn" id="fundBtn">Initialize Deposit</button>
+        <h3>Fund Liquidity</h3>
+        <input type="number" id="deposit-amount" placeholder="Amount Min 100">
+        <select id="deposit-currency">
+            <option value="NGN">NGN - Nigerian Naira</option>
+        </select>
+        <button id="deposit-btn" class="btn-primary">Initialize Deposit</button>
     </div>
 
     <div class="card">
-      <h3>Global Remittance Pipeline</h3>
-      <input type="text" id="recipient" class="input" placeholder="Recipient Email OR Wallet ID">
-      <input type="number" id="sendAmount" class="input" placeholder="Transfer Amount" style="margin-top: 10px;">
-      <select id="sendCurrency" class="select" style="margin-top: 10px;">
-        <option value="NGN">NGN</option>
-        <option value="GHS">GHS</option>
-        <option value="KES">KES</option>
-        <option value="USD">USD</option>
-        <option value="EUR">EUR</option>
-        <option value="GBP">GBP</option>
-      </select>
-      <input type="text" id="reference" class="input" placeholder="Reference Memo (Optional)" style="margin-top: 10px;">
-      <p id="sendError" style="color:red; font-size:12px; margin-top:5px"></p>
-      <button class="btn" id="sendBtn">Execute Payout</button>
+        <h3>Global Remittance Pipeline</h3>
+        <input type="text" id="recipient" placeholder="Recipient Email OR Wallet ID">
+        <input type="number" id="transfer-amount" placeholder="Transfer Amount">
+        <select id="transfer-currency">
+            <option value="NGN">NGN</option>
+        </select>
+        <input type="text" id="transfer-memo" placeholder="Reference Memo (Optional)">
+        <button id="payout-btn" class="btn-primary">Execute Payout</button>
     </div>
 
     <div class="card">
-      <h3 style="margin-bottom: 10px;">Audit Log / Ledgers</h3>
-      <div id="transactionList" style="font-size: 14px; color: #555;">No ledger items recorded.</div>
+        <h3>Audit Log / Ledgers</h3>
+        <div id="audit-log">
+            <p>credit <span style="float:right;">+₦1000.00 - pending</span><br>
+            <small>Invalid Date</small></p>
+        </div>
     </div>
 
-    <!-- MOVED TO SETTINGS AREA -->
-    <div style="padding: 0 10px 20px 10px;">
-      <button class="btn btn-danger" id="deleteAccountBtn">Delete Account</button>
+    <!-- NEW: CLEANED UP DELETE ACCOUNT SECTION -->
+    <div class="card" style="border: 1px solid #ffcccc; background: #fff5f5;">
+        <h3 style="color: #d32f2f;">Danger Zone</h3>
+        <p style="font-size: 12px; color: #666;">Once you delete your account, there is no going back.</p>
+        <button id="delete-account-btn" class="btn-danger" style="width:100%;">Delete Account</button>
     </div>
-  </div>
+
 </div>
 
+<!-- NEW: DELETE CONFIRMATION MODAL -->
+<div id="delete-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center;">
+    <div style="background:white; padding:20px; border-radius:10px; width:90%; max-width:400px;">
+        <h3 style="color: #d32f2f;">Are you absolutely sure?</h3>
+        <p>This action cannot be undone. All your data will be permanently deleted.</p>
+        <input type="password" id="delete-password" placeholder="Enter your password to confirm" style="width:100%; padding:10px; margin:10px 0; border:1px solid #ccc; border-radius:5px;">
+        <div style="display:flex; gap:10px;">
+            <button id="confirm-delete-btn" class="btn-danger" style="flex:1;">Yes, Delete</button>
+            <button id="cancel-delete-btn" class="btn-secondary" style="flex:1;">Cancel</button>
+        </div>
+    </div>
+</div>
 <div id="toastContainer"></div>
 
 <script src="app.js?v=5"></script>
