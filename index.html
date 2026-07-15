@@ -9,7 +9,7 @@
 body { background: #f5f5f5; }
 .container { max-width: 500px; margin: 0 auto; background: white; min-height: 100vh; display: flex; flex-direction: column; }
 
-/* UPDATED HEADER */
+/* HEADER */
 .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
 .header-left { display: flex; align-items: center; gap: 12px; }
 .header-logo { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
@@ -21,6 +21,8 @@ body { background: #f5f5f5; }
 .btn { width: 100%; padding: 14px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; transition: background 0.2s ease; }
 .btn:hover { background: #556ee6; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary { width: 100%; padding: 14px; background: #f0f4ff; color: #667eea; border: 1px solid #d0ddff; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+.btn-secondary:hover { background: #e0e8ff; }
 .btn-danger { background: #ff4757; }
 .btn-danger:hover { background: #e03e4e; }
 .input-group { position: relative; width: 100%; margin-top: 10px; }
@@ -28,26 +30,25 @@ body { background: #f5f5f5; }
 .input:focus, .select:focus { border-color: #667eea; outline: none; box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); }
 .password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #777; cursor: pointer; font-size: 14px; display: none; }
 .card { background: white; padding: 20px; margin: 15px 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.welcome-card { background: white; padding: 20px; margin: 15px 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 .hidden { display: none !important; }
-.balance { font-size: 22px; font-weight: bold; color: #667eea; margin-top: 4px; }
+.badge { background: #eee; padding: 4px 8px; border-radius: 6px; font-family: monospace; font-size: 12px; }
+.badge-verified { background: #2ed573; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .currency-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-.currency-card { background: #f0f4ff; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #e0e8ff; }
+.currency-item { background: #f0f4ff; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #e0e8ff; font-size: 14px; }
 .txn { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
 .success { color: #2ed573; font-weight: 600; } .pending { color: #ffa502; font-weight: 600; } .failed { color: #ff4757; font-weight: 600; }
-.kyc-badge { background: #2ed573; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.kyc-pending { background: #ffa502; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.wallet-id { background: #eee; padding: 6px 10px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #333; }
 #toastContainer { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 90%; max-width: 400px; }
 .toast { background: #333; color: white; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; animation: slideUp 0.3s ease; }
 .toast.success { background: #2ed573; } .toast.error { background: #ff4757; }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
 </head>
 <body>
 
 <div class="container">
-  <!-- UPDATED HEADER WITH LOGO + LOGOUT -->
-  <div class="header">
+  <!-- SINGLE HEADER -->
+  <div class="header" id="mainHeader">
     <div class="header-left">
       <img src="creativepay-logo.png" alt="CreativePay Logo" class="header-logo" />
       <div class="header-text">
@@ -95,23 +96,19 @@ body { background: #f5f5f5; }
     <button class="btn" id="verifyBvnBtn">Verify BVN Data</button>
   </div>
 
-  <!-- MAIN DASHBOARD -->
-  <div class="dashboard">
-    <div class="header">
-        <div class="logo">
-            <img src="logo.png" alt="CreativePay"> CreativePay
-        </div>
-        <button id="logout-btn" class="btn-outline">Logout</button>
-    </div>
-
+  <!-- MAIN DASHBOARD - SINGLE VERSION -->
+  <div id="dashboardSection" class="hidden">
     <div class="welcome-card">
         <h2>Welcome, <span id="user-name">Test Final</span></h2>
         <p id="user-email">testfinal123@gmail.com</p>
-        <p>Account ID: <span id="account-id" class="badge">CFA1A40882</span></p>
+        <p>Account ID: <span class="badge">CFA1A40882</span></p>
         <p>KYC Tier: <span class="badge-verified">Verified</span></p>
-        
-        <!-- NEW: FACIAL VERIFICATION BUTTON -->
-        <button id="facial-verify-btn" class="btn-secondary" style="margin-top:10px; width:100%;">
+
+        <!-- BVN + FACIAL BUTTONS -->
+        <button id="bvn-verify-btn" class="btn-secondary">
+            🆔 BVN Verification
+        </button>
+        <button id="facial-verify-btn" class="btn-secondary">
             📸 Start Facial Verification
         </button>
     </div>
@@ -130,22 +127,22 @@ body { background: #f5f5f5; }
 
     <div class="card">
         <h3>Fund Liquidity</h3>
-        <input type="number" id="deposit-amount" placeholder="Amount Min 100">
-        <select id="deposit-currency">
+        <input type="number" id="deposit-amount" class="input" placeholder="Amount Min 100">
+        <select id="deposit-currency" class="select">
             <option value="NGN">NGN - Nigerian Naira</option>
         </select>
-        <button id="deposit-btn" class="btn-primary">Initialize Deposit</button>
+        <button id="deposit-btn" class="btn">Initialize Deposit</button>
     </div>
 
     <div class="card">
         <h3>Global Remittance Pipeline</h3>
-        <input type="text" id="recipient" placeholder="Recipient Email OR Wallet ID">
-        <input type="number" id="transfer-amount" placeholder="Transfer Amount">
-        <select id="transfer-currency">
+        <input type="text" id="recipient" class="input" placeholder="Recipient Email OR Wallet ID">
+        <input type="number" id="transfer-amount" class="input" placeholder="Transfer Amount">
+        <select id="transfer-currency" class="select">
             <option value="NGN">NGN</option>
         </select>
-        <input type="text" id="transfer-memo" placeholder="Reference Memo (Optional)">
-        <button id="payout-btn" class="btn-primary">Execute Payout</button>
+        <input type="text" id="transfer-memo" class="input" placeholder="Reference Memo (Optional)">
+        <button id="payout-btn" class="btn">Execute Payout</button>
     </div>
 
     <div class="card">
@@ -156,16 +153,17 @@ body { background: #f5f5f5; }
         </div>
     </div>
 
-    <!-- NEW: CLEANED UP DELETE ACCOUNT SECTION -->
+    <!-- DANGER ZONE -->
     <div class="card" style="border: 1px solid #ffcccc; background: #fff5f5;">
         <h3 style="color: #d32f2f;">Danger Zone</h3>
         <p style="font-size: 12px; color: #666;">Once you delete your account, there is no going back.</p>
-        <button id="delete-account-btn" class="btn-danger" style="width:100%;">Delete Account</button>
+        <button id="delete-account-btn" class="btn-danger">Delete Account</button>
     </div>
+  </div>
 
 </div>
 
-<!-- NEW: DELETE CONFIRMATION MODAL -->
+<!-- DELETE CONFIRMATION MODAL -->
 <div id="delete-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:999; justify-content:center; align-items:center;">
     <div style="background:white; padding:20px; border-radius:10px; width:90%; max-width:400px;">
         <h3 style="color: #d32f2f;">Are you absolutely sure?</h3>
@@ -177,8 +175,9 @@ body { background: #f5f5f5; }
         </div>
     </div>
 </div>
+
 <div id="toastContainer"></div>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
