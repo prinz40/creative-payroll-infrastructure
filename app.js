@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================================================
 function toggleAuthMode() {
   isLoginMode = !isLoginMode;
-  
+
   const authTitle = document.getElementById('authTitle');
   const nameGroup = document.getElementById('nameGroup');
   const loginBtn = document.getElementById('loginBtn');
@@ -233,38 +233,19 @@ async function loadDashboard() {
       document.getElementById('userDispName').innerText = data.user.name || 'Core Account';
       document.getElementById('userDispEmail').innerText = data.user.email || '';
       document.getElementById('walletId').innerText = data.walletId || 'CP-ALLOCATING';
-      
+
       const kycNode = document.getElementById('kycStatus');
-kycNode.innerText = data.user.kycTier || 'Unverified';
-kycNode.className = data.user.kycTier === 'Verified' ? 'kyc-badge' : 'kyc-pending';
+      kycNode.innerText = data.user.kycTier || 'Unverified';
+      kycNode.className = data.user.kycTier === 'Verified' ? 'kyc-badge' : 'kyc-pending';
 
-// ADD KYC BUTTON IF NOT VERIFIED
-if(data.user.kycTier !== 'Verified') {
-  const kycBtn = document.createElement('button');
-  kycBtn.innerText = 'Verify BVN';
-  kycBtn.style.marginLeft = '10px';
-  kycBtn.onclick = showKycModal;
-  kycNode.parentNode.appendChild(kycBtn);
-}
-
-function showKycModal() {
-  const bvn = prompt("Enter your 11 digit BVN");
-  if(bvn && bvn.length === 11) {
-    fetch(`${API_URL}/kyc/verify-bvn`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-      body: JSON.stringify({bvn})
-    }).then(res => res.json()).then(data => {
-      alert(data.message); 
-      if(data.success) window.location.reload();
-    }).catch(err => {
-      alert("KYC Error: " + err.message);
-      console.error(err);
-    });
-  } else if(bvn) {
-    alert("Please enter 11 digits");
-  }
-}
+      // ADD KYC BUTTON IF NOT VERIFIED
+      if(data.user.kycTier !== 'Verified') {
+        const kycBtn = document.createElement('button');
+        kycBtn.innerText = 'Verify BVN';
+        kycBtn.style.marginLeft = '10px';
+        kycBtn.onclick = showKycModal;
+        kycNode.parentNode.appendChild(kycBtn);
+      }
 
       const b = data.balances || {};
       document.getElementById('balanceNGN').innerText = `₦${parseFloat(b.NGN || 0).toFixed(2)}`;
@@ -285,7 +266,7 @@ function showKycModal() {
 }
 
 // ============================================================================
-// AUDIT LEDGERS: DISPATCH TRANSACTION SYSTEM HISTORY
+// AUDIT LEDGERS: DISPATCH TRANSACTION SYSTEM HISTORY - FIXED
 // ============================================================================
 async function loadTransactions() {
   const transactionList = document.getElementById('transactionList');
@@ -297,13 +278,13 @@ async function loadTransactions() {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await response.json();
-    
+
     if(data.success && data.transactions.length > 0) {
       transactionList.innerHTML = data.transactions.map(tx => `
         <div class="txn">
           <div>
             <div style="font-weight:600">${tx.type}</div>
-            <div style="font-size:12px; color:gray">${new Date(tx.date).toLocaleDateString()} ${new Date(tx.date).toLocaleTimeString()}</div>
+            <div style="font-size:12px; color:gray">${tx.date}</div>
           </div>
           <div class="${tx.status}">${tx.amount > 0 ? '+' : ''}₦${Math.abs(tx.amount).toFixed(2)} - ${tx.status}</div>
         </div>
@@ -314,6 +295,28 @@ async function loadTransactions() {
   } catch (err) {
     console.error(err);
     transactionList.innerText = 'Could not load transactions';
+  }
+}
+
+// ============================================================================
+// KYC MODAL
+// ============================================================================
+function showKycModal() {
+  const bvn = prompt("Enter your 11 digit BVN");
+  if(bvn && bvn.length === 11) {
+    fetch(`${API_URL}/kyc/verify-bvn`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+      body: JSON.stringify({bvn})
+    }).then(res => res.json()).then(data => {
+      alert(data.message); 
+      if(data.success) window.location.reload();
+    }).catch(err => {
+      alert("KYC Error: " + err.message);
+      console.error(err);
+    });
+  } else if(bvn) {
+    alert("Please enter 11 digits");
   }
 }
 
