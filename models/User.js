@@ -22,16 +22,20 @@ const UserSchema = new mongoose.Schema({
         enum: ['admin', 'employee', 'employer'],
         default: 'employer'
     },
-    walletId: { // added this so we can link to wallet
+    walletId: {
         type: String,
         required: true,
         unique: true
     },
-    kycTier: { // added this for BVN verification
-        type: Number,
-        default: 0
+    kycTier: { // FIXED: Changed from Number to String
+        type: String,
+        default: 'Unverified'
     },
-    balances: { // added this so login returns balances
+    bvn: { // ADDED: This was missing
+        type: String,
+        default: null
+    },
+    balances: {
         NGN: { type: Number, default: 0 },
         GHS: { type: Number, default: 0 },
         KES: { type: Number, default: 0 },
@@ -39,6 +43,6 @@ const UserSchema = new mongoose.Schema({
         EUR: { type: Number, default: 0 },
         GBP: { type: Number, default: 0 }
     }
-}, { timestamps: true }); // changed from createdAt to timestamps
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);
