@@ -42,6 +42,9 @@ body { background: #f5f5f5; }
 .toast { background: #333; color: white; padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; margin-top: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: center; animation: slideUp 0.3s ease; }
 .toast.success { background: #2ed573; } .toast.error { background: #ff4757; }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* NEW: CAMERA PREVIEW */
+#cameraPreview { width: 100%; border-radius: 12px; margin-top: 10px; display: none; border: 2px solid #667eea; }
 </style>
 </head>
 <body>
@@ -111,6 +114,8 @@ body { background: #f5f5f5; }
         <button id="facial-verify-btn" class="btn-secondary">
             📸 Start Facial Verification
         </button>
+        <!-- NEW: CAMERA SURFACE -->
+        <video id="cameraPreview" autoplay playsinline></video>
     </div>
 
     <div class="card">
@@ -128,8 +133,14 @@ body { background: #f5f5f5; }
     <div class="card">
         <h3>Fund Liquidity</h3>
         <input type="number" id="deposit-amount" class="input" placeholder="Amount Min 100">
+        <!-- FIXED: ALL 6 CURRENCIES -->
         <select id="deposit-currency" class="select">
             <option value="NGN">NGN - Nigerian Naira</option>
+            <option value="GHS">GHS - Ghana Cedi</option>
+            <option value="KES">KES - Kenyan Shilling</option>
+            <option value="USD">USD - US Dollar</option>
+            <option value="EUR">EUR - Euro</option>
+            <option value="GBP">GBP - British Pound</option>
         </select>
         <button id="deposit-btn" class="btn">Initialize Deposit</button>
     </div>
@@ -138,8 +149,14 @@ body { background: #f5f5f5; }
         <h3>Global Remittance Pipeline</h3>
         <input type="text" id="recipient" class="input" placeholder="Recipient Email OR Wallet ID">
         <input type="number" id="transfer-amount" class="input" placeholder="Transfer Amount">
+        <!-- FIXED: ALL 6 CURRENCIES -->
         <select id="transfer-currency" class="select">
-            <option value="NGN">NGN</option>
+            <option value="NGN">NGN - Nigerian Naira</option>
+            <option value="GHS">GHS - Ghana Cedi</option>
+            <option value="KES">KES - Kenyan Shilling</option>
+            <option value="USD">USD - US Dollar</option>
+            <option value="EUR">EUR - Euro</option>
+            <option value="GBP">GBP - British Pound</option>
         </select>
         <input type="text" id="transfer-memo" class="input" placeholder="Reference Memo (Optional)">
         <button id="payout-btn" class="btn">Execute Payout</button>
@@ -178,6 +195,6 @@ body { background: #f5f5f5; }
 
 <div id="toastContainer"></div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
