@@ -330,25 +330,28 @@ async function handleBvnVerification() {
 // HANDLER: FACIAL VERIFICATION - LIVENESS CHECK
 // ============================================================================
 async function handleFacialVerification() {
+  const video = document.getElementById('cameraPreview');
   try {
     showToast('Requesting camera access...', 'success');
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-
-    // For production you would send frames to backend here
+    
+    if(video) {
+      video.srcObject = stream;
+      video.style.display = 'block';
+    }
     showToast('Camera active. Hold still for facial scan...', 'success');
 
     setTimeout(() => {
       stream.getTracks().forEach(track => track.stop());
+      if(video) video.style.display = 'none';
       showToast('Facial Verification Successful', 'success');
-      // TODO: send verification to backend: /api/kyc/verify-face
-    }, 3000);
+      // TODO: send frame to backend: /api/kyc/verify-face
+    }, 4000);
   } catch (err) {
     showToast('Camera access denied', 'error');
     console.error(err);
   }
-}
-
-// ============================================================================
+} ============================================================================
 // HANDLER: FUND WALLET / DEPOSIT LIQUIDITY - MAPPED TO NEW IDS
 // ============================================================================
 async function handleFundWallet() {
