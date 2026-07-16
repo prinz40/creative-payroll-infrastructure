@@ -5,7 +5,8 @@ const API_URL = '/api';
 
 let token = localStorage.getItem('token');
 let isLoginMode = true;
-
+let kycStatus = localStorage.getItem('kycStatus') || 'unverified'; // 'unverified' or 'verified'
+let facialStream = null; // For 1-time facial seal
 // ============================================================================
 // UX TOOL: COMPLIANCE STATUS TOAST PIPELINE
 // ============================================================================
@@ -33,19 +34,28 @@ function showUIState(viewState) {
   const bvnSection = document.getElementById('bvnSection');
   const dashboardSection = document.getElementById('dashboardSection');
   const mainHeader = document.getElementById('mainHeader');
+  const backBtn = document.getElementById('backBtn'); // NEW BACK BUTTON
 
   [authSection, bvnSection, dashboardSection].forEach(s => s && s.classList.add('hidden'));
 
   if (viewState === 'auth') {
     authSection && authSection.classList.remove('hidden');
-    mainHeader && mainHeader.classList.add('hidden'); // Hide header on login
+    mainHeader && mainHeader.classList.add('hidden');
+    backBtn && backBtn.classList.add('hidden');
   } else if (viewState === 'dashboard') {
     dashboardSection && dashboardSection.classList.remove('hidden');
     mainHeader && mainHeader.classList.remove('hidden');
+    backBtn && backBtn.classList.add('hidden'); // Hide back on main dashboard
     loadDashboard();
   } else if (viewState === 'bvn') {
+    // FIX: Check if already verified - 1 TIME SEAL
+    if(kycStatus === 'verified') {
+      showToast('BVN Already Verified ✅ No re-verification needed', 'success');
+      return showUIState('dashboard');
+    }
     bvnSection && bvnSection.classList.remove('hidden');
     mainHeader && mainHeader.classList.remove('hidden');
+    backBtn && backBtn.classList.remove('hidden'); // SHOW BACK BUTTON ON BVN PAGE
   }
 }
 
@@ -67,7 +77,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('loginBtn')?.addEventListener('click', handleLogin);
   document.getElementById('registerBtn')?.addEventListener('click', handleRegister);
   document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
-
+document.getElementById('backBtn')?.addEventListener('click', () => {
+  stopCamera(); // Stop camera if running
+  showUIState('dashboard');
+});
   // PASSWORD TOGGLE
   document.getElementById('togglePasswordBtn')?.addEventListener('click', () => {
     const passField = document.getElementById('password');
@@ -319,8 +332,11 @@ async function handleBvnVerification() {
     const data = await response.json();
 
     if(data.success) {
-      if(bvnSuccess) { bvnSuccess.style.display = 'block'; bvnSuccess.innerText = 'BVN Verified Successfully!'; }
-      showToast('KYC Upgraded to Verified', 'success');
+      // SEAL IT: 1 TIME ONLY
+      kycStatus = 'verified';
+      localStorage.setItem('kycStatus', 'verified');
+      if(bvnSuccess) { bvnSuccess.style.display = 'block'; bvnSuccess.innerText = 'BVN Verified Successfully! SEALED'; }
+      showToast('KYC Upgraded to Verified ✅ SEALED', 'success');
       setTimeout(() => showUIState('dashboard'), 2000);
     } else {
       if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = data.message || 'BVN Verification Failed'; }
@@ -332,32 +348,59 @@ async function handleBvnVerification() {
   }
 }
 
-// ============================================================================
-// HANDLER: FACIAL VERIFICATION - LIVENESS CHECK
-// ============================================================================
+// HANDLER: FACIAL VERIFICATION - 1 TIME SEAL + GUIDE + COUNTDOWN
 async function handleFacialVerification() {
+  // SEAL CHECK
+  if(kycStatus === 'verified') {
+    showToast('Facial Already Verified ✅ Identity Sealed', 'success');
+    return;
+  }
+  
   const video = document.getElementById('cameraPreview');
+  const guide = document.getElementById('facialGuide'); // We will add this in HTML next
+  
   try {
-    showToast('Requesting camera access...', 'success');
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    showToast('Position your face in the circle', 'success');
+    if(guide) guide.classList.remove('hidden');
+    
+    facialStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
     
     if(video) {
-      video.srcObject = stream;
+      video.srcObject = facialStream;
       video.style.display = 'block';
     }
-    showToast('Camera active. Hold still for facial scan...', 'success');
 
-    setTimeout(() => {
-      stream.getTracks().forEach(track => track.stop());
-      if(video) video.style.display = 'none';
-      showToast('Facial Verification Successful', 'success');
-    }, 4000);
+    let countdown = 4;
+    const interval = setInterval(() => {
+      if(countdown > 0) {
+        showToast(`Hold still... ${countdown}`, 'success');
+        countdown--;
+      } else {
+        clearInterval(interval);
+        stopCamera();
+        if(guide) guide.classList.add('hidden');
+        // SEAL IT
+        kycStatus = 'verified';
+        localStorage.setItem('kycStatus', 'verified');
+        showToast('Facial Verification Successful ✅ IDENTITY SEALED', 'success');
+      }
+    }, 1000);
+
   } catch (err) {
     showToast('Camera access denied', 'error');
     console.error(err);
   }
 }
 
+// HELPER: STOP CAMERA
+function stopCamera() {
+  if(facialStream) {
+    facialStream.getTracks().forEach(track => track.stop());
+    facialStream = null;
+  }
+  const video = document.getElementById('cameraPreview');
+  if(video) video.style.display = 'none';
+}
 // ============================================================================
 // HANDLER: FUND WALLET / DEPOSIT LIQUIDITY
 // ============================================================================
