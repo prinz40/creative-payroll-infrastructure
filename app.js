@@ -26,26 +26,26 @@ function showToast(message, type = 'success') {
 }
 
 // ============================================================================
-// SPA ROUTING ENGINE: UPDATE VIEW STATE MAPS CLEANLY - FIXED IDs
+// SPA ROUTING ENGINE: UPDATE VIEW STATE MAPS CLEANLY - FIXED
 // ============================================================================
 function showUIState(viewState) {
   const authSection = document.getElementById('authSection');
   const bvnSection = document.getElementById('bvnSection');
-  const dashboardSection = document.getElementById('dashboardSection'); // FIXED
+  const dashboardSection = document.getElementById('dashboardSection');
   const mainHeader = document.getElementById('mainHeader');
 
-  [authSection, bvnSection, dashboardSection].forEach(s => s.classList.add('hidden'));
+  [authSection, bvnSection, dashboardSection].forEach(s => s && s.classList.add('hidden'));
 
   if (viewState === 'auth') {
-    authSection.classList.remove('hidden');
-    mainHeader.classList.add('hidden');
+    authSection && authSection.classList.remove('hidden');
+    mainHeader && mainHeader.classList.add('hidden'); // Hide header on login
   } else if (viewState === 'dashboard') {
-    dashboardSection.classList.remove('hidden');
-    mainHeader.classList.remove('hidden');
+    dashboardSection && dashboardSection.classList.remove('hidden');
+    mainHeader && mainHeader.classList.remove('hidden');
     loadDashboard();
   } else if (viewState === 'bvn') {
-    bvnSection.classList.remove('hidden');
-    mainHeader.classList.remove('hidden');
+    bvnSection && bvnSection.classList.remove('hidden');
+    mainHeader && mainHeader.classList.remove('hidden');
   }
 }
 
@@ -66,24 +66,32 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('loginBtn')?.addEventListener('click', handleLogin);
   document.getElementById('registerBtn')?.addEventListener('click', handleRegister);
-  document.getElementById('logoutBtn')?.addEventListener('click', handleLogout); // FIXED ID
+  document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
 
   // PASSWORD TOGGLE
   document.getElementById('togglePasswordBtn')?.addEventListener('click', () => {
     const passField = document.getElementById('password');
-    passField.type = passField.type === 'password'? 'text' : 'password';
-    document.getElementById('togglePasswordBtn').innerText = passField.type === 'password'? 'Show' : 'Hide';
+    if(passField) {
+      passField.type = passField.type === 'password'? 'text' : 'password';
+      document.getElementById('togglePasswordBtn').innerText = passField.type === 'password'? 'Show' : 'Hide';
+    }
   });
 
   // KYC + FACIAL + DELETE
   document.getElementById('bvn-verify-btn')?.addEventListener('click', () => showUIState('bvn'));
   document.getElementById('verifyBvnBtn')?.addEventListener('click', handleBvnVerification);
   document.getElementById('facial-verify-btn')?.addEventListener('click', handleFacialVerification);
-  document.getElementById('delete-account-btn')?.addEventListener('click', () => document.getElementById('delete-modal').style.display = 'flex');
-  document.getElementById('cancel-delete-btn')?.addEventListener('click', () => document.getElementById('delete-modal').style.display = 'none');
+  document.getElementById('delete-account-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('delete-modal');
+    if(modal) modal.style.display = 'flex';
+  });
+  document.getElementById('cancel-delete-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('delete-modal');
+    if(modal) modal.style.display = 'none';
+  });
   document.getElementById('confirm-delete-btn')?.addEventListener('click', handleDeleteAccount);
 
-  // WALLET + PAYOUT - MAPPED TO NEW IDS
+  // WALLET + PAYOUT
   document.getElementById('deposit-btn')?.addEventListener('click', handleFundWallet);
   document.getElementById('payout-btn')?.addEventListener('click', handleSendMoney);
 });
@@ -100,20 +108,20 @@ function toggleAuthMode() {
   const toggleAuthLink = document.getElementById('toggleAuthLink');
   const errorMsg = document.getElementById('errorMsg');
 
-  errorMsg.innerText = '';
+  if(errorMsg) errorMsg.innerText = '';
 
   if (isLoginMode) {
-    authTitle.innerText = 'Login';
-    nameGroup.classList.add('hidden');
-    loginBtn.classList.remove('hidden');
-    registerBtn.classList.add('hidden');
-    toggleAuthLink.innerText = "Don't have an account? Register";
+    authTitle && (authTitle.innerText = 'Login');
+    nameGroup && nameGroup.classList.add('hidden');
+    loginBtn && loginBtn.classList.remove('hidden');
+    registerBtn && registerBtn.classList.add('hidden');
+    toggleAuthLink && (toggleAuthLink.innerText = "Don't have an account? Register");
   } else {
-    authTitle.innerText = 'Register Account';
-    nameGroup.classList.remove('hidden');
-    loginBtn.classList.add('hidden');
-    registerBtn.classList.remove('hidden');
-    toggleAuthLink.innerText = "Already have an account? Login";
+    authTitle && (authTitle.innerText = 'Register Account');
+    nameGroup && nameGroup.classList.remove('hidden');
+    loginBtn && loginBtn.classList.add('hidden');
+    registerBtn && registerBtn.classList.remove('hidden');
+    toggleAuthLink && (toggleAuthLink.innerText = "Already have an account? Login");
   }
 }
 
@@ -121,19 +129,19 @@ function toggleAuthMode() {
 // HANDLER: CORE USER AUTHENTICATION
 // ============================================================================
 async function handleLogin() {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
+  const email = document.getElementById('email')?.value.trim();
+  const password = document.getElementById('password')?.value;
   const loginBtn = document.getElementById('loginBtn');
   const errorMsg = document.getElementById('errorMsg');
 
   if (!email ||!password) {
-    errorMsg.innerText = 'Email and password credentials are required.';
+    if(errorMsg) errorMsg.innerText = 'Email and password credentials are required.';
     return;
   }
 
   try {
     setLoadingState(loginBtn, true, 'Authenticating...');
-    errorMsg.innerText = '';
+    if(errorMsg) errorMsg.innerText = '';
 
     const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
@@ -150,12 +158,12 @@ async function handleLogin() {
       showUIState('dashboard');
       clearAuthInputs();
     } else {
-      errorMsg.innerText = data.message || 'Login credentials rejected.';
+      if(errorMsg) errorMsg.innerText = data.message || 'Login credentials rejected.';
       showToast(data.message || 'Verification rejected', 'error');
     }
   } catch (err) {
     console.error(err);
-    errorMsg.innerText = 'Communication link timeout on core infrastructure.';
+    if(errorMsg) errorMsg.innerText = 'Communication link timeout on core infrastructure.';
     showToast('Network error', 'error');
   } finally {
     setLoadingState(loginBtn, false, 'Login');
@@ -166,20 +174,20 @@ async function handleLogin() {
 // HANDLER: ONBOARDING ACCREDITATION / REGISTRATION
 // ============================================================================
 async function handleRegister() {
-  const fullName = document.getElementById('fullName').value.trim();
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
+  const fullName = document.getElementById('fullName')?.value.trim();
+  const email = document.getElementById('email')?.value.trim();
+  const password = document.getElementById('password')?.value;
   const registerBtn = document.getElementById('registerBtn');
   const errorMsg = document.getElementById('errorMsg');
 
   if (!fullName ||!email ||!password) {
-    errorMsg.innerText = 'All profiling credentials are required to onboard.';
+    if(errorMsg) errorMsg.innerText = 'All profiling credentials are required to onboard.';
     return;
   }
 
   try {
     setLoadingState(registerBtn, true, 'Processing Profiling...');
-    errorMsg.innerText = '';
+    if(errorMsg) errorMsg.innerText = '';
 
     const response = await fetch(`${API_URL}/register`, {
       method: 'POST',
@@ -196,12 +204,12 @@ async function handleRegister() {
       showUIState('dashboard');
       clearAuthInputs();
     } else {
-      errorMsg.innerText = data.message || 'Onboarding registration failed.';
+      if(errorMsg) errorMsg.innerText = data.message || 'Onboarding registration failed.';
       showToast(data.message || 'Registration rejected', 'error');
     }
   } catch (err) {
     console.error(err);
-    errorMsg.innerText = 'Unable to bind communication network with core rail.';
+    if(errorMsg) errorMsg.innerText = 'Unable to bind communication network with core rail.';
     showToast('Network error', 'error');
   } finally {
     setLoadingState(registerBtn, false, 'Register Account');
@@ -209,7 +217,7 @@ async function handleRegister() {
 }
 
 // ============================================================================
-// RUNTIME ENGINE: RETRIEVE PORTFOLIO ASSETS & BALANCES - MAPPED TO NEW IDS
+// RUNTIME ENGINE: RETRIEVE PORTFOLIO ASSETS & BALANCES
 // ============================================================================
 async function loadDashboard() {
   if (!token) return;
@@ -223,10 +231,12 @@ async function loadDashboard() {
     const data = await response.json();
 
     if (data.success) {
-      // MAPPED TO NEW HTML IDs
-      document.getElementById('user-name').innerText = data.user.name || 'Test Final';
-      document.getElementById('user-email').innerText = data.user.email || '';
-      document.getElementById('account-id').innerText = data.walletId || 'CFA1A40882';
+      document.getElementById('user-name') && (document.getElementById('user-name').innerText = data.user?.name || 'Test Final');
+      document.getElementById('user-email') && (document.getElementById('user-email').innerText = data.user?.email || '');
+      
+      // FIXED: Use badge span instead of account-id
+      const badge = document.querySelector('.badge');
+      if(badge) badge.innerText = data.walletId || 'CFA1A40882';
 
       // Balances - map to new currency grid
       const b = data.balances || {};
@@ -254,7 +264,7 @@ async function loadDashboard() {
 // AUDIT LEDGERS: DISPATCH TRANSACTION SYSTEM HISTORY
 // ============================================================================
 async function loadTransactions() {
-  const auditLog = document.getElementById('audit-log'); // FIXED ID
+  const auditLog = document.getElementById('audit-log');
   if (!auditLog) return;
 
   try {
@@ -264,12 +274,12 @@ async function loadTransactions() {
     });
     const data = await response.json();
 
-    if(data.success && data.transactions.length > 0) {
+    if(data.success && data.transactions?.length > 0) {
       auditLog.innerHTML = data.transactions.map(tx => `
         <div class="txn">
           <div>
             <div style="font-weight:600">${tx.type}</div>
-            <div style="font-size:12px; color:gray">${tx.date}</div>
+            <div style="font-size:12px; color:gray">${new Date(tx.date).toLocaleDateString()}</div>
           </div>
           <div class="${tx.status}">${tx.amount > 0? '+' : ''}₦${Math.abs(tx.amount).toFixed(2)} - ${tx.status}</div>
         </div>
@@ -287,16 +297,15 @@ async function loadTransactions() {
 // HANDLER: BVN VERIFICATION - PRODUCTION
 // ============================================================================
 async function handleBvnVerification() {
-  const bvn = document.getElementById('bvnInput').value.trim();
+  const bvn = document.getElementById('bvnInput')?.value.trim();
   const bvnError = document.getElementById('bvnError');
   const bvnSuccess = document.getElementById('bvnSuccess');
 
-  bvnError.style.display = 'none';
-  bvnSuccess.style.display = 'none';
+  if(bvnError) bvnError.style.display = 'none';
+  if(bvnSuccess) bvnSuccess.style.display = 'none';
 
   if (!bvn || bvn.length!== 11) {
-    bvnError.style.display = 'block';
-    bvnError.innerText = 'BVN must be exactly 11 digits';
+    if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'BVN must be exactly 11 digits'; }
     return;
   }
 
@@ -310,17 +319,14 @@ async function handleBvnVerification() {
     const data = await response.json();
 
     if(data.success) {
-      bvnSuccess.style.display = 'block';
-      bvnSuccess.innerText = 'BVN Verified Successfully!';
+      if(bvnSuccess) { bvnSuccess.style.display = 'block'; bvnSuccess.innerText = 'BVN Verified Successfully!'; }
       showToast('KYC Upgraded to Verified', 'success');
       setTimeout(() => showUIState('dashboard'), 2000);
     } else {
-      bvnError.style.display = 'block';
-      bvnError.innerText = data.message || 'BVN Verification Failed';
+      if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = data.message || 'BVN Verification Failed'; }
     }
   } catch (err) {
-    bvnError.style.display = 'block';
-    bvnError.innerText = 'Network error during BVN verification';
+    if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'Network error during BVN verification'; }
   } finally {
     setLoadingState(document.getElementById('verifyBvnBtn'), false, 'Verify BVN Data');
   }
@@ -345,18 +351,19 @@ async function handleFacialVerification() {
       stream.getTracks().forEach(track => track.stop());
       if(video) video.style.display = 'none';
       showToast('Facial Verification Successful', 'success');
-      // TODO: send frame to backend: /api/kyc/verify-face
     }, 4000);
   } catch (err) {
     showToast('Camera access denied', 'error');
     console.error(err);
   }
-} ============================================================================
-// HANDLER: FUND WALLET / DEPOSIT LIQUIDITY - MAPPED TO NEW IDS
+}
+
+// ============================================================================
+// HANDLER: FUND WALLET / DEPOSIT LIQUIDITY
 // ============================================================================
 async function handleFundWallet() {
-  const amount = document.getElementById('deposit-amount').value; // FIXED ID
-  const currency = document.getElementById('deposit-currency').value;
+  const amount = document.getElementById('deposit-amount')?.value;
+  const currency = document.getElementById('deposit-currency')?.value;
   const fundBtn = document.getElementById('deposit-btn');
 
   if (!amount || amount < 100) {
@@ -376,8 +383,8 @@ async function handleFundWallet() {
     const data = await response.json();
 
     if (data.success) {
-      showToast(`₦${amount} funded successfully!`, 'success');
-      document.getElementById('deposit-amount').value = '';
+      showToast(`${currency} ${amount} funded successfully!`, 'success');
+      document.getElementById('deposit-amount') && (document.getElementById('deposit-amount').value = '');
       loadDashboard();
       loadTransactions();
     } else {
@@ -392,13 +399,13 @@ async function handleFundWallet() {
 }
 
 // ============================================================================
-// HANDLER: GLOBAL REMITTANCE / PAYOUT - MAPPED TO NEW IDS
+// HANDLER: GLOBAL REMITTANCE / PAYOUT
 // ============================================================================
 async function handleSendMoney() {
-  const recipient = document.getElementById('recipient').value.trim();
-  const amount = document.getElementById('transfer-amount').value; // FIXED ID
-  const currency = document.getElementById('transfer-currency').value;
-  const reference = document.getElementById('transfer-memo').value; // FIXED ID
+  const recipient = document.getElementById('recipient')?.value.trim();
+  const amount = document.getElementById('transfer-amount')?.value;
+  const currency = document.getElementById('transfer-currency')?.value;
+  const reference = document.getElementById('transfer-memo')?.value;
   const sendBtn = document.getElementById('payout-btn');
 
   if (!recipient ||!amount || amount < 10) {
@@ -418,10 +425,10 @@ async function handleSendMoney() {
     const data = await response.json();
 
     if (data.success) {
-      showToast(`₦${amount} sent to ${recipient}`, 'success');
-      document.getElementById('recipient').value = '';
-      document.getElementById('transfer-amount').value = '';
-      document.getElementById('transfer-memo').value = '';
+      showToast(`${currency} ${amount} sent to ${recipient}`, 'success');
+      document.getElementById('recipient') && (document.getElementById('recipient').value = '');
+      document.getElementById('transfer-amount') && (document.getElementById('transfer-amount').value = '');
+      document.getElementById('transfer-memo') && (document.getElementById('transfer-memo').value = '');
       loadDashboard();
       loadTransactions();
     } else {
@@ -439,7 +446,7 @@ async function handleSendMoney() {
 // HANDLER: DELETE ACCOUNT - PRODUCTION
 // ============================================================================
 async function handleDeleteAccount() {
-  const password = document.getElementById('delete-password').value;
+  const password = document.getElementById('delete-password')?.value;
   if (!password) return showToast('Enter password to confirm', 'error');
 
   try {
@@ -454,7 +461,7 @@ async function handleDeleteAccount() {
     if(data.success) {
       localStorage.clear();
       token = null;
-      document.getElementById('delete-modal').style.display = 'none';
+      document.getElementById('delete-modal') && (document.getElementById('delete-modal').style.display = 'none');
       showToast('Account Deleted Permanently', 'success');
       showUIState('auth');
     } else {
@@ -487,7 +494,7 @@ function setLoadingState(button, isLoading, text) {
 }
 
 function clearAuthInputs() {
-  document.getElementById('email').value = '';
-  document.getElementById('password').value = '';
-  document.getElementById('fullName').value = '';
-}
+  document.getElementById('email') && (document.getElementById('email').value = '');
+  document.getElementById('password') && (document.getElementById('password').value = '');
+  document.getElementById('fullName') && (document.getElementById('fullName').value = '');
+                                                           }
