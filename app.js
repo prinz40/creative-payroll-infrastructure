@@ -370,7 +370,7 @@ async function handleBvnVerification() {
     const response = await fetch(`https://api.paystack.co/bank/resolve_bvn/${bvn}`, {
       method: 'GET',
       headers: {
-        'Authorization': 'Bearer pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e
+        'Authorization': 'Bearer pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
         'Content-Type': 'application/json'
       }
     });
@@ -379,7 +379,7 @@ async function handleBvnVerification() {
     if (data.status === true) {
       // SEAL IT: 1 TIME ONLY
       localStorage.setItem('kycStatus', 'verified');
-      localStorage.setItem('bvnName', data.data.first_name + ' + data.data.last_name); // FIXED
+      localStorage.setItem('bvnName', data.data.first_name + ' ' + data.data.last_name); // FIXED
       if(bvnSuccess) { 
         bvnSuccess.style.display = 'block'; 
         bvnSuccess.innerText = `BVN Verified Successfully! SEALED: ${data.data.first_name}`; 
