@@ -309,33 +309,81 @@ async function loadTransactions() {
 // ============================================================================
 // HANDLER: BVN VERIFICATION - PRODUCTION
 // ============================================================================
+// OLD BACKEND VERSION - BACKUP v10b
+// async function handleBvnVerification() {
+//   const bvn = document.getElementById('bvnInput')?.value.trim();
+//   const bvnError = document.getElementById('bvnError');
+//   const bvnSuccess = document.getElementById('bvnSuccess');
+//
+//   if(bvnError) bvnError.style.display = 'none';
+//   if(bvnSuccess) bvnSuccess.style.display = 'none';
+//
+//   if (!bvn || bvn.length!== 11) {
+//     if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'BVN must be exactly 11 digits'; }
+//     return;
+//   }
+//
+//   try {
+//     setLoadingState(document.getElementById('verifyBvnBtn'), true, 'Verifying...');
+//     const response = await fetch(`${API_URL}/kyc/verify-bvn`, {
+//       method: 'POST',
+//       headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+//       body: JSON.stringify({bvn})
+//     });
+//     const data = await response.json();
+//
+//     if(data.success) {
+//       // SEAL IT: 1 TIME ONLY
+//       kycStatus = 'verified';
+//       localStorage.setItem('kycStatus', 'verified');
+//       if(bvnSuccess) { bvnSuccess.style.display = 'block'; bvnSuccess.innerText = 'BVN Verified Successfully! SEALED'; }
+//       showToast('KYC Upgraded to Verified ✅ SEALED', 'success');
+//       setTimeout(() => showUIState('dashboard'), 2000);
+//     } else {
+//       if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = data.message || 'BVN Verification Failed'; }
+//     }
+//   } catch (err) {
+//     if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'Network error during BVN verification'; }
+//   } finally {
+//     setLoadingState(document.getElementById('verifyBvnBtn'), false, 'Verify BVN Data');
+//   }
+// }
+
+// NEW: DIRECT PAYSTACK BVN VERIFICATION v10c
 async function handleBvnVerification() {
   const bvn = document.getElementById('bvnInput')?.value.trim();
   const bvnError = document.getElementById('bvnError');
   const bvnSuccess = document.getElementById('bvnSuccess');
+  const btn = document.getElementById('verifyBvnBtn');
 
   if(bvnError) bvnError.style.display = 'none';
   if(bvnSuccess) bvnSuccess.style.display = 'none';
 
-  if (!bvn || bvn.length!== 11) {
+  if (!bvn || bvn.length !== 11) {
     if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'BVN must be exactly 11 digits'; }
     return;
   }
 
+  setLoadingState(btn, true, 'Verifying...');
+
   try {
-    setLoadingState(document.getElementById('verifyBvnBtn'), true, 'Verifying...');
-    const response = await fetch(`${API_URL}/kyc/verify-bvn`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
-      body: JSON.stringify({bvn})
+    const response = await fetch(`https://api.paystack.co/bank/resolve_bvn/${bvn}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer pk_test_22b404c1f15be9c94cbde8be2b54d9aa3bce9b4e',
+        'Content-Type': 'application/json'
+      }
     });
     const data = await response.json();
 
-    if(data.success) {
+    if (data.status === true) {
       // SEAL IT: 1 TIME ONLY
-      kycStatus = 'verified';
       localStorage.setItem('kycStatus', 'verified');
-      if(bvnSuccess) { bvnSuccess.style.display = 'block'; bvnSuccess.innerText = 'BVN Verified Successfully! SEALED'; }
+      localStorage.setItem('bvnName', data.data.first_name + ' + data.data.last_name);
+      if(bvnSuccess) { 
+        bvnSuccess.style.display = 'block'; 
+        bvnSuccess.innerText = `BVN Verified Successfully! SEALED: ${data.data.first_name}`; 
+      }
       showToast('KYC Upgraded to Verified ✅ SEALED', 'success');
       setTimeout(() => showUIState('dashboard'), 2000);
     } else {
@@ -344,7 +392,7 @@ async function handleBvnVerification() {
   } catch (err) {
     if(bvnError) { bvnError.style.display = 'block'; bvnError.innerText = 'Network error during BVN verification'; }
   } finally {
-    setLoadingState(document.getElementById('verifyBvnBtn'), false, 'Verify BVN Data');
+    setLoadingState(btn, false, 'Verify BVN Data');
   }
 }
 
